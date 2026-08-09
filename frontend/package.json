@@ -10,8 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "framer-motion": "^13.0.0",
+    "lucide-react": "^1.30.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
