@@ -21,18 +21,18 @@ export default function PeoplePanel({ data, mode }) {
   });
 
   return (
-    <div className="glass-panel rounded-2xl p-4 flex flex-col h-full shadow-xl">
+    <div className="bg-white rounded-lg p-4 flex flex-col h-full shadow">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-cyan-500/20 mb-3">
+      <div className="flex items-center justify-between pb-3 border-b border-gray-200 mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+          <div className="p-2 rounded-lg bg-blue-100 text-blue-600 border border-blue-200">
             <Users className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-200 text-sm tracking-wide">
+            <h3 className="font-semibold text-gray-800 text-sm tracking-wide">
               {mode === PROJECT_MODES.TRAFFIC ? 'TRACKED VEHICLES' : 'TRACKED PEOPLE'}
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-gray-600">
               Active Tracks: <span className="text-cyan-400 font-bold">{entities.length}</span>
             </p>
           </div>
@@ -48,7 +48,7 @@ export default function PeoplePanel({ data, mode }) {
             placeholder="Filter ID, status..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-900/80 border border-slate-700/60 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition"
+            className="w-full bg-white border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-500 transition"
           />
         </div>
 
@@ -58,7 +58,7 @@ export default function PeoplePanel({ data, mode }) {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition flex-shrink-0 ${filter === f ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800'}`}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition flex-shrink-0 ${filter === f ? 'bg-blue-500 text-white font-bold' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'}`}
               >
                 {f}
               </button>

@@ -10,7 +10,7 @@ export default function ThreeBackground() {
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x070913, 0.015);
+    scene.fog = new THREE.FogExp2(0xf8fafc, 0.015);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(
@@ -28,13 +28,15 @@ export default function ThreeBackground() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Cybernetic Grid Plane
-    const gridHelper = new THREE.GridHelper(120, 40, 0x06b6d4, 0x1e293b);
+    // Light Theme Grid Plane
+    const gridHelper = new THREE.GridHelper(120, 40, 0x3b82f6, 0xe2e8f0);
     gridHelper.position.y = -5;
+    gridHelper.material.opacity = 0.15;
+    gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
-    // 3D Particles
-    const particlesCount = 400;
+    // Soft Blue Particles
+    const particlesCount = 300;
     const posArray = new Float32Array(particlesCount * 3);
     const scaleArray = new Float32Array(particlesCount);
 
@@ -49,23 +51,22 @@ export default function ThreeBackground() {
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.4,
-      color: 0x06b6d4,
+      size: 0.3,
+      color: 0x3b82f6,
       transparent: true,
-      opacity: 0.7,
-      blending: THREE.AdditiveBlending
+      opacity: 0.35
     });
 
     const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
     scene.add(particleMesh);
 
-    // 3D Floating AI Wireframe Nodes
+    // 3D Floating Node
     const nodeGeometry = new THREE.IcosahedronGeometry(3, 1);
     const nodeMaterial = new THREE.MeshBasicMaterial({
-      color: 0xa855f7,
+      color: 0x8b5cf6,
       wireframe: true,
       transparent: true,
-      opacity: 0.4
+      opacity: 0.15
     });
 
     const node1 = new THREE.Mesh(nodeGeometry, nodeMaterial);
@@ -105,18 +106,18 @@ export default function ThreeBackground() {
       const elapsedTime = clock.getElapsedTime();
 
       // Smooth camera sway based on mouse
-      camera.position.x += (mouseX * 5 - camera.position.x) * 0.03;
-      camera.position.y += (-mouseY * 3 + 15 - camera.position.y) * 0.03;
+      camera.position.x += (mouseX * 4 - camera.position.x) * 0.03;
+      camera.position.y += (-mouseY * 2 + 15 - camera.position.y) * 0.03;
       camera.lookAt(0, 0, 0);
 
       // Rotate nodes & grid
-      node1.rotation.x = elapsedTime * 0.3;
-      node1.rotation.y = elapsedTime * 0.5;
+      node1.rotation.x = elapsedTime * 0.2;
+      node1.rotation.y = elapsedTime * 0.3;
 
-      node2.rotation.x = -elapsedTime * 0.2;
-      node2.rotation.y = elapsedTime * 0.4;
+      node2.rotation.x = -elapsedTime * 0.15;
+      node2.rotation.y = elapsedTime * 0.25;
 
-      particleMesh.rotation.y = elapsedTime * 0.03;
+      particleMesh.rotation.y = elapsedTime * 0.02;
 
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(animate);
@@ -139,7 +140,7 @@ export default function ThreeBackground() {
     <div
       ref={mountRef}
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
-      style={{ opacity: 0.85 }}
+      style={{ opacity: 0.95 }}
     />
   );
 }

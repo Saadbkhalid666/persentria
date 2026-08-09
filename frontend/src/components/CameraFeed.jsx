@@ -7,7 +7,6 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
   const [webcamActive, setWebcamActive] = useState(false);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(true);
-  const [showStats, setShowStats] = useState(true);
   const [webcamError, setWebcamError] = useState(null);
 
   const videoRef = useRef(null);
@@ -61,16 +60,16 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
     // Draw Simulated Background Video Graphic if webcam is off
     if (!webcamActive) {
-      // Futuristic Dark Room Gradient
+      // Light Mode Room Gradient
       const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      grad.addColorStop(0, '#0a0f1d');
-      grad.addColorStop(0.5, '#070913');
-      grad.addColorStop(1, '#0d1326');
+      grad.addColorStop(0, '#f1f5f9');
+      grad.addColorStop(0.5, '#e2e8f0');
+      grad.addColorStop(1, '#cbd5e1');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw perspective room grid lines
-      ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)';
+      // Draw light perspective room grid lines
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.12)';
       ctx.lineWidth = 1;
       for (let i = 0; i < canvas.width; i += 60) {
         ctx.beginPath();
@@ -96,11 +95,11 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         const isTalking = person.talking;
         const isSmiling = person.smiling;
 
-        const mainColor = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : isSmiling ? '#10b981' : '#a855f7';
+        const mainColor = isDrowsy ? '#ef4444' : isTalking ? '#3b82f6' : isSmiling ? '#10b981' : '#8b5cf6';
 
         // 1. Draw Corner Reticle Bounding Box
         ctx.strokeStyle = mainColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
 
         const cornerLen = 16;
         // Top-Left
@@ -132,12 +131,12 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         ctx.stroke();
 
         // Semi-transparent box fill
-        ctx.fillStyle = `${mainColor}15`;
+        ctx.fillStyle = `${mainColor}12`;
         ctx.fillRect(x, y, w, h);
 
         // 2. Draw ID & Status Tag Banner
-        ctx.fillStyle = 'rgba(7, 9, 19, 0.85)';
-        ctx.strokeStyle = mainColor;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.strokeStyle = '#cbd5e1';
         ctx.lineWidth = 1;
         const tagHeight = 26;
         ctx.fillRect(x, y - tagHeight - 4, 180, tagHeight);
@@ -148,16 +147,19 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         ctx.fillText(`ID #${person.id} | ${person.confidence ? (person.confidence * 100).toFixed(0) : 95}%`, x + 8, y - 12);
 
         // Behavior badges below box
-        ctx.fillStyle = 'rgba(13, 18, 36, 0.9)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         ctx.fillRect(x, y + h + 4, 160, 22);
-        ctx.fillStyle = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : '#e2e8f0';
-        ctx.font = '11px sans-serif';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.strokeRect(x, y + h + 4, 160, 22);
+        
+        ctx.fillStyle = isDrowsy ? '#ef4444' : isTalking ? '#3b82f6' : '#334155';
+        ctx.font = 'bold 11px sans-serif';
         const labelText = isDrowsy ? '⚠️ Drowsiness' : isTalking ? '🗣️ Talking' : isSmiling ? '😊 Smiling' : '👤 Stationary';
-        ctx.fillText(labelText, x + 6, y + h + 18);
+        ctx.fillText(labelText, x + 8, y + h + 18);
 
         // 3. Draw Face Landmark Points if enabled
         if (showLandmarks && person.faceLandmarks) {
-          ctx.fillStyle = '#06b6d4';
+          ctx.fillStyle = '#3b82f6';
           person.faceLandmarks.forEach((pt) => {
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 2, 0, 2 * Math.PI);
@@ -172,19 +174,19 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
       data.vehicles.forEach((vehicle) => {
         const [x, y, w, h] = vehicle.bbox;
         const isSpeeding = vehicle.speedKmh > 70;
-        const mainColor = isSpeeding ? '#f59e0b' : '#06b6d4';
+        const mainColor = isSpeeding ? '#f59e0b' : '#3b82f6';
 
         ctx.strokeStyle = mainColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.strokeRect(x, y, w, h);
 
-        ctx.fillStyle = `${mainColor}20`;
+        ctx.fillStyle = `${mainColor}12`;
         ctx.fillRect(x, y, w, h);
 
         // Tag
-        ctx.fillStyle = 'rgba(7, 9, 19, 0.9)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         ctx.fillRect(x, y - 28, 200, 24);
-        ctx.strokeStyle = mainColor;
+        ctx.strokeStyle = '#cbd5e1';
         ctx.strokeRect(x, y - 28, 200, 24);
 
         ctx.fillStyle = mainColor;
@@ -196,17 +198,17 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
   }, [data, showBoxes, showLandmarks, mode, webcamActive]);
 
   return (
-    <div className="glass-panel-glow rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between h-full shadow-2xl">
+    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between h-full">
       {/* Header bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-cyan-500/20 mb-3 z-10">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-400 animate-ping" />
-          <span className="font-semibold text-slate-200 tracking-wider text-sm flex items-center gap-2">
-            <Camera className="w-4 h-4 text-cyan-400" />
+          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+          <span className="font-semibold text-slate-800 tracking-wider text-sm flex items-center gap-2">
+            <Camera className="w-4 h-4 text-blue-500" />
             AI CAMERA FEED OVERLAY
           </span>
-          <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-            {mode} INTELLIGENCE
+          <span className="text-xs px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 font-medium">
+            {mode} Mode
           </span>
         </div>
 
@@ -214,7 +216,7 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setStreamSource(streamSource === 'simulated' ? 'webcam' : 'simulated')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${streamSource === 'webcam' ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${streamSource === 'webcam' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
           >
             <Video className="w-3.5 h-3.5" />
             {streamSource === 'webcam' ? 'Live Webcam' : 'Use Webcam'}
@@ -222,7 +224,7 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
           <button
             onClick={() => setShowBoxes(!showBoxes)}
-            className={`p-1.5 rounded-lg text-xs transition ${showBoxes ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800 text-slate-500'}`}
+            className={`p-1.5 rounded-lg text-xs transition ${showBoxes ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
             title="Toggle Bounding Boxes"
           >
             <Layers className="w-4 h-4" />
@@ -230,7 +232,7 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
           <button
             onClick={() => setShowLandmarks(!showLandmarks)}
-            className={`p-1.5 rounded-lg text-xs transition ${showLandmarks ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-slate-800 text-slate-500'}`}
+            className={`p-1.5 rounded-lg text-xs transition ${showLandmarks ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
             title="Toggle Facial Landmarks"
           >
             <Sparkles className="w-4 h-4" />
@@ -239,14 +241,14 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
       </div>
 
       {webcamError && (
-        <div className="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2">
+        <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {webcamError}
         </div>
       )}
 
       {/* Main View Area */}
-      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-cyan-500/20 shadow-inner flex items-center justify-center">
+      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
         {/* Hidden video element for real webcam */}
         <video
           ref={videoRef}
@@ -264,26 +266,26 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         />
 
         {/* HUD Scanner Frame lines */}
-        <div className="absolute inset-0 pointer-events-none border border-cyan-500/20 z-20">
-          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-400" />
-          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-400" />
-          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-cyan-400" />
-          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-400" />
+        <div className="absolute inset-0 pointer-events-none border border-slate-300/40 z-20">
+          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-slate-400" />
+          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-slate-400" />
+          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-slate-400" />
+          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-slate-400" />
         </div>
 
         {/* Top Info HUD Bar */}
-        <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/50 z-30 flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5 text-cyan-400 font-mono">
+        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200/80 z-30 flex items-center gap-3 text-xs text-slate-600 shadow-sm">
+          <div className="flex items-center gap-1.5 text-blue-600 font-bold">
             <Cpu className="w-3.5 h-3.5" />
             YOLOv8 + MediaPipe
           </div>
-          <div className="w-px h-3 bg-slate-700" />
-          <div className="text-slate-300 font-mono">
-            FPS: <span className="text-emerald-400 font-bold">{data?.fps || 30}</span>
+          <div className="w-px h-3 bg-slate-200" />
+          <div>
+            FPS: <span className="text-emerald-600 font-bold">{data?.fps || 30}</span>
           </div>
-          <div className="w-px h-3 bg-slate-700" />
-          <div className="text-slate-300 font-mono">
-            Latency: <span className="text-cyan-300 font-bold">{data?.latencyMs || 14}ms</span>
+          <div className="w-px h-3 bg-slate-200" />
+          <div>
+            Latency: <span className="text-blue-600 font-bold">{data?.latencyMs || 14}ms</span>
           </div>
         </div>
       </div>

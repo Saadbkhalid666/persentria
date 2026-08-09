@@ -1,122 +1,95 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import ThreeBackground from './components/ThreeBackground';
+import Header from './components/Header';
+import Statistics from './components/Statistics';
+import CameraFeed from './components/CameraFeed';
+import PeoplePanel from './components/PeoplePanel';
+import EventLog from './components/EventLog';
+import ActivityChart from './components/ActivityChart';
+import { visionWS } from './lib/websocket';
+import { PROJECT_MODES } from './lib/types';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [mode, setMode] = useState(PROJECT_MODES.ROOM);
+  const [isConnected, setIsConnected] = useState(false);
+  const [telemetry, setTelemetry] = useState(null);
+  const [events, setEvents] = useState([]);
+
+  // Connect & listen to AI stream WebSocket
+  useEffect(() => {
+    visionWS.connect();
+
+    const unsubscribe = visionWS.subscribe((msg) => {
+      if (msg.type === 'STATUS') {
+        setIsConnected(msg.connected);
+      } else if (msg.type === 'DATA') {
+        setTelemetry(msg.payload);
+        if (msg.payload.events && msg.payload.events.length > 0) {
+          setEvents(msg.payload.events);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    visionWS.setMode(newMode);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="relative min-h-screen bg-[#070913] text-slate-100 p-4 md:p-6 overflow-hidden">
+      {/* Interactive 3D Three.js Particle Grid Background */}
+      <ThreeBackground />
 
-      <div className="ticks"></div>
+      {/* Main Glassmorphic Layout Container */}
+      <div className="relative z-10 max-w-[1700px] mx-auto space-y-4">
+        {/* Top AI Header */}
+        <Header
+          isConnected={isConnected}
+          mode={mode}
+          onModeChange={handleModeChange}
+        />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {/* 3D KPI Statistics Cards */}
+        <Statistics data={telemetry} mode={mode} />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {/* Main Grid: Camera Feed & Tracked People Panel */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch min-h-[480px]">
+          {/* Left: Camera Feed Overlay (7 cols) */}
+          <div className="lg:col-span-7 h-full">
+            <CameraFeed
+              data={telemetry}
+              mode={mode}
+              isWebsocketConnected={isConnected}
+            />
+          </div>
+
+          {/* Right: Tracked People / Vehicles Panel (5 cols) */}
+          <div className="lg:col-span-5 h-full">
+            <PeoplePanel data={telemetry} mode={mode} />
+          </div>
+        </div>
+
+        {/* Bottom Grid: Real-time Event Engine Log & Analytics Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch min-h-[300px]">
+          {/* Left: Event Engine Log (6 cols) */}
+          <div className="lg:col-span-6 h-full">
+            <EventLog events={events} />
+          </div>
+
+          {/* Right: Time-Series Activity Chart (6 cols) */}
+          <div className="lg:col-span-6 h-full">
+            <ActivityChart data={telemetry} mode={mode} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="text-center py-2 text-xs text-slate-500 font-mono">
+          VisionX AI Scene Intelligence Platform • Python (OpenCV, YOLO, MediaPipe, ByteTrack, FastAPI) + React Dashboard
+        </footer>
+      </div>
+    </div>
+  );
 }
-
-export default App
