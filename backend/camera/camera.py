@@ -1,7 +1,7 @@
 import cv2
 import time
 
-def open_camera(camera_index=0, width=1280, height=720, fps=60):
+def open_camera(camera_index=0, width=1280, height=720, fps=30):
     camera = cv2.VideoCapture(camera_index)
 
     if not camera.isOpened():
