@@ -3,8 +3,9 @@ import time
 
 from camera.camera import open_camera, read_frame, release_camera
 from detection.person_detector import load_model
+from detection.face_analyzer import create_face_landmarker, analyze_faces
 from tracking.object_tracker import track_people, detect_entry_exit
-
+from analysis.eye_state import get_eye_state
 
 def draw_people(frame, people):
     for person in people:
@@ -41,12 +42,31 @@ def main():
     )
 
     model = load_model()
+    landmarker = create_face_landmarker()
+    start_time = time.monotonic()
 
     previous_time = time.time()
 
     try:
         while True:
             frame = read_frame(camera)
+            timestamp_ms = int(
+                (time.monotonic() - start_time) * 1000
+            )
+
+            face_result = analyze_faces(
+                landmarker,
+                frame,
+                timestamp_ms
+            )
+            for face_landmarks in face_result.face_landmarks:
+
+                eye_state = get_eye_state(face_landmarks)
+
+                print(
+                    f"Eyes: {eye_state['state']} | "
+                    f"EAR: {eye_state['average_ratio']:.3f}"
+                )
 
             people = track_people(model, frame)
 
@@ -94,6 +114,7 @@ def main():
                 break
 
     finally:
+        landmarker.close()
         release_camera(camera)
         cv2.destroyAllWindows()
 
