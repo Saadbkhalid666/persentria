@@ -1,63 +1,93 @@
 import cv2
 import time
-from flask import Flask
-from flask_cors import CORS
+
 from camera.camera import open_camera, read_frame, release_camera
-from detection.person_detector import load_model, detect_people
+from detection.person_detector import load_model
+from detection.face_analyzer import create_face_landmarker, analyze_faces
+from tracking.object_tracker import track_people, detect_entry_exit
+from analysis.eye_state import get_eye_state
 
 def draw_people(frame, people):
     for person in people:
         x1, y1, x2, y2 = person["bbox"]
-        confidence = person["confidence"]
+        person_id = person["track_id"]
 
         cv2.rectangle(
             frame,
-            (x1,y1),
-            (x2,y2),
+            (x1, y1),
+            (x2, y2),
             (0, 255, 0),
             2
         )
-        label = f"Person {confidence:.2f}"
+
+        label = f"Person #{person_id}"
+
         cv2.putText(
             frame,
             label,
             (x1, y1 - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
+            0.7,
             (0, 255, 0),
             2
         )
-    return frame    
 
-def create_app():
-    app = Flask(__name__)
 
-    CORS(app,
-    supports_credentials=True
-    )
+def main():
     camera = open_camera(
         camera_index=0,
         width=1280,
         height=720,
-        fps=60
+        fps=30
     )
-    model = load_model()
-    previous_time = time.time()
-    try:
 
+    model = load_model()
+    landmarker = create_face_landmarker()
+    start_time = time.monotonic()
+
+    previous_time = time.time()
+
+    try:
         while True:
             frame = read_frame(camera)
-            people = detect_people(model,frame)
-            draw_people(frame,people)
+            timestamp_ms = int(
+                (time.monotonic() - start_time) * 1000
+            )
 
-            
+            face_result = analyze_faces(
+                landmarker,
+                frame,
+                timestamp_ms
+            )
+            for face_landmarks in face_result.face_landmarks:
+
+                eye_state = get_eye_state(face_landmarks)
+
+                print(
+                    f"Eyes: {eye_state['state']} | "
+                    f"EAR: {eye_state['average_ratio']:.3f}"
+                )
+
+            people = track_people(model, frame)
+
+            events = detect_entry_exit(people)
+
+            draw_people(frame, people)
+
+
+            for person_id in events["entered"]:
+                print(f"Person #{person_id} entered")
+
+            for person_id in events["left"]:
+                print(f"Person #{person_id} left")
+
             current_time = time.time()
             elapsed_time = current_time - previous_time
+
             fps = 1 / elapsed_time if elapsed_time > 0 else 0
-            
-            
+
             previous_time = current_time
-            
+
             cv2.putText(
                 frame,
                 f"FPS: {fps:.1f}",
@@ -77,20 +107,17 @@ def create_app():
                 (0, 255, 0),
                 2
             )
+
             cv2.imshow("Persentria", frame)
-            
+
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
-       
-    except RuntimeError as error:
-        print(f"Camera error: {error}")
 
     finally:
+        landmarker.close()
         release_camera(camera)
         cv2.destroyAllWindows()
-    return app
 
 
 if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True)
+    main()
