@@ -55,6 +55,7 @@ def main():
                 (time.monotonic() - start_time) * 1000
             )
 
+            people = track_people(model, frame)
             face_result = analyze_faces(
                 landmarker,
                 frame,
@@ -78,7 +79,7 @@ def main():
 
             for match in matches:
                 person_id = match["person_id"]
-                face_landmarks = match[landmarks]
+                face_landmarks = match["landmarks"]
                 eye_state = get_eye_state(face_landmarks)
 
                 print(
@@ -87,7 +88,6 @@ def main():
                     f"EAR: {eye_state['average_ratio']:.3f}"
                 )
 
-            people = track_people(model, frame)
 
             events = detect_entry_exit(people)
 
