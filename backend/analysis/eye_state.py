@@ -1,5 +1,5 @@
-import time
 import math
+import time
 
 
 LEFT_EYE = [
@@ -11,7 +11,6 @@ RIGHT_EYE = [
 ]
 
 
-# Stores eye state for each tracked person
 eye_states = {}
 
 
@@ -44,7 +43,7 @@ def calculate_eye_aspect_ratio(landmarks, eye_indices):
     return (vertical_1 + vertical_2) / (2 * horizontal)
 
 
-def get_eye_state(face_landmarks, person_id=None, threshold=0.20):
+def get_eye_state(face_landmarks, person_id, threshold=0.20):
     left_ratio = calculate_eye_aspect_ratio(
         face_landmarks,
         LEFT_EYE
@@ -61,53 +60,43 @@ def get_eye_state(face_landmarks, person_id=None, threshold=0.20):
 
     current_time = time.monotonic()
 
-    if person_id is None:
-        return {
-            "state": (
-                "closed"
-                if average_ratio < threshold
-                else "open"
-            ),
-            "left_ratio": left_ratio,
-            "right_ratio": right_ratio,
-            "average_ratio": average_ratio
-        }
-
     if person_id not in eye_states:
         eye_states[person_id] = {
-            "closed": False,
+            "is_closed": False,
             "closed_since": None,
             "blink_count": 0
         }
 
-    state_data = eye_states[person_id]
+    state = eye_states[person_id]
 
+    # Eyes are currently closed
     if average_ratio < threshold:
 
-        if not state_data["closed"]:
-            state_data["closed"] = True
-            state_data["closed_since"] = current_time
+        if not state["is_closed"]:
+            state["is_closed"] = True
+            state["closed_since"] = current_time
 
+    # Eyes are currently open
     else:
 
-        if state_data["closed"]:
+        if state["is_closed"]:
             closed_duration = (
-                current_time -
-                state_data["closed_since"]
+                current_time - state["closed_since"]
             )
 
+            # Short eye closure = blink
             if 0.05 <= closed_duration <= 0.5:
-                state_data["blink_count"] += 1
+                state["blink_count"] += 1
 
-            state_data["closed"] = False
-            state_data["closed_since"] = None
+            state["is_closed"] = False
+            state["closed_since"] = None
 
     closed_duration = 0
 
-    if state_data["closed"]:
+    if state["is_closed"]:
         closed_duration = (
             current_time -
-            state_data["closed_since"]
+            state["closed_since"]
         )
 
     return {
@@ -120,5 +109,5 @@ def get_eye_state(face_landmarks, person_id=None, threshold=0.20):
         "right_ratio": right_ratio,
         "average_ratio": average_ratio,
         "closed_duration": closed_duration,
-        "blink_count": state_data["blink_count"]
+        "blink_count": state["blink_count"]
     }
