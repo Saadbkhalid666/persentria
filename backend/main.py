@@ -7,6 +7,7 @@ from detection.face_analyzer import create_face_landmarker, analyze_faces
 from tracking.object_tracker import track_people, detect_entry_exit
 from analysis.eye_state import get_eye_state
 from analysis.face_person_matcher import match_faces_to_people
+from analysis.talking import detect_talking
 
 def draw_people(frame, people):
     for person in people:
@@ -63,7 +64,7 @@ def main():
             )
             for face_landmarks in face_result.face_landmarks:
 
-                eye_state = get_eye_state(face_landmarks)
+                eye_state = get_eye_state(face_landmarks, person_id)
 
                 print(
                     f"Eyes: {eye_state['state']} | "
@@ -82,11 +83,17 @@ def main():
                 face_landmarks = match["landmarks"]
                 eye_state = get_eye_state(face_landmarks, person_id)
 
+                talking = detect_talking(
+                    face_landmarks,
+                    person_id
+                )
+
                 print(
                     f"Person #{person_id} | "
                     f"Eyes: {eye_state['state']} | "
-                    f"Blink count: {eye_state['blink_count']} | "
-                    f"EAR: {eye_state['average_ratio']:.3f}"
+                    f"Blinks: {eye_state['blink_count']} | "
+                    f"Talking: {talking['talking']} | "
+                    f"Mouth: {talking['mouth_ratio']:.3f}"
                 )
 
 
