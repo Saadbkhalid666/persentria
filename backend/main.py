@@ -6,6 +6,7 @@ from detection.person_detector import load_model
 from detection.face_analyzer import create_face_landmarker, analyze_faces
 from tracking.object_tracker import track_people, detect_entry_exit
 from analysis.eye_state import get_eye_state
+from analysis.face_person_matcher import match_faces_to_people
 
 def draw_people(frame, people):
     for person in people:
@@ -64,6 +65,24 @@ def main():
                 eye_state = get_eye_state(face_landmarks)
 
                 print(
+                    f"Eyes: {eye_state['state']} | "
+                    f"EAR: {eye_state['average_ratio']:.3f}"
+                )
+
+            matches = match_faces_to_people(
+                face_result.face_landmarks,
+                people,
+                frame.shape[1],
+                frame.shape[0]
+            )
+
+            for match in matches:
+                person_id = match["person_id"]
+                face_landmarks = match[landmarks]
+                eye_state = get_eye_state(face_landmarks)
+
+                print(
+                    f"Person #{person_id} | "
                     f"Eyes: {eye_state['state']} | "
                     f"EAR: {eye_state['average_ratio']:.3f}"
                 )
