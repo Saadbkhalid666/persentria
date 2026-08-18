@@ -63,7 +63,7 @@ def main():
             )
             for face_landmarks in face_result.face_landmarks:
 
-                eye_state = get_eye_state(face_landmarks, person_id)
+                eye_state = get_eye_state(face_landmarks)
 
                 print(
                     f"Eyes: {eye_state['state']} | "
@@ -80,11 +80,12 @@ def main():
             for match in matches:
                 person_id = match["person_id"]
                 face_landmarks = match["landmarks"]
-                eye_state = get_eye_state(face_landmarks)
+                eye_state = get_eye_state(face_landmarks, person_id)
 
                 print(
                     f"Person #{person_id} | "
                     f"Eyes: {eye_state['state']} | "
+                    f"Blink count: {eye_state['blink_count']} | "
                     f"EAR: {eye_state['average_ratio']:.3f}"
                 )
 
