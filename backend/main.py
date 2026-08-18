@@ -63,7 +63,7 @@ def main():
             )
             for face_landmarks in face_result.face_landmarks:
 
-                eye_state = get_eye_state(face_landmarks)
+                eye_state = get_eye_state(face_landmarks, person_id)
 
                 print(
                     f"Eyes: {eye_state['state']} | "
