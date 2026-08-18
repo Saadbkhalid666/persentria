@@ -2,14 +2,16 @@ import cv2
 import time
 
 def open_camera(camera_index=0, width=1280, height=720, fps=30):
-    camera = cv2.VideoCapture(camera_index)
+    camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
 
     if not camera.isOpened():
         raise RuntimeError("Could not Open Camera")
 
+    camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    camera.set(cv2.CAP_PROP_FPS, fps)
+    camera.set(cv2.CAP_PROP_FPS, fps)   
 
     return camera
 
