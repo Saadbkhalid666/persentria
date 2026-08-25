@@ -95,8 +95,9 @@ def main():
                     face_landmarks,
                     person_id
                 )
-                smiling = detect_smile(
-                    face_landmarks
+                smile = detect_smile(
+                    face_landmarks,
+                    person_id
                 )
 
                 print(
@@ -105,8 +106,8 @@ def main():
                     f"Blinks: {eye_state['blink_count']} | "
                     f"Talking: {talking['talking']} | "
                     f"Mouth: {talking['mouth_ratio']:.3f} | "
-                    f"Smiling: {smiling['smiling']} | "
-                    f"Smile Curve: {smiling['smile_curve']:.3f}"
+                    f"Smiling: {smile['smiling']} | "
+                    f"Smile Curve: {smile['smile_score']:.3f}"
                 )
 
             events = detect_entry_exit(
