@@ -106,7 +106,7 @@ def main():
                     f"Talking: {talking['talking']} | "
                     f"Mouth: {talking['mouth_ratio']:.3f} | "
                     f"Smiling: {smiling['smiling']} | "
-                    f"Smile Ratio: {smiling['smile_ratio']:.3f}"
+                    f"Smile Curve: {smiling['smile_curve']:.3f}"
                 )
 
             events = detect_entry_exit(
