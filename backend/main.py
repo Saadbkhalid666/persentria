@@ -1,7 +1,7 @@
 import cv2
 import time
 
-from camera.camera import (
+from input.camera import (
     open_camera,
     read_frame,
     release_camera
