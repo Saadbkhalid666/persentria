@@ -66,9 +66,13 @@ def main():
                     f"Eyes: {person['eye_state']['state']} | "
                     f"Blinks: {person['eye_state']['blink_count']} | "
                     f"Talking: {person['talking']['talking']} | "
-                    f"Mouth: {person['talking']['mouth_ratio']:.3f} | "
-                    f"Posture: {person['state']}"    
+                    f"Mouth: {person['talking']['mouth_ratio']:.3f}"
                 )
+
+            for posture in results["postures"]:
+                print(
+                    f"Posture: {posture['state']}"
+                )   
 
             cv2.putText(
                 frame,
