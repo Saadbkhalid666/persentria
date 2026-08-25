@@ -33,7 +33,7 @@ def calculate_smile_ratio(face_landmarks):
 
 def detect_smile(
     face_landmarks,
-    threshold=3.0
+    threshold=4.0
 ):
     smile_ratio = calculate_smile_ratio(
         face_landmarks
