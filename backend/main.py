@@ -8,7 +8,7 @@ from tracking.object_tracker import track_people, detect_entry_exit
 from analysis.eye_state import get_eye_state
 from analysis.face_person_matcher import match_faces_to_people
 from analysis.talking import detect_talking
-from analysis.smiling import detect_smile
+
 
 def draw_people(frame, people):
     for person in people:
@@ -95,19 +95,13 @@ def main():
                     face_landmarks,
                     person_id
                 )
-                smile = detect_smile(
-                    face_landmarks,
-                    person_id
-                )
 
                 print(
                     f"Person #{person_id} | "
                     f"Eyes: {eye_state['state']} | "
                     f"Blinks: {eye_state['blink_count']} | "
                     f"Talking: {talking['talking']} | "
-                    f"Mouth: {talking['mouth_ratio']:.3f} | "
-                    f"Smiling: {smile['smiling']} | "
-                    f"Smile Curve: {smile['smile_score']:.3f}"
+                    f"Mouth: {talking['mouth_ratio']:.3f}"
                 )
 
             events = detect_entry_exit(
