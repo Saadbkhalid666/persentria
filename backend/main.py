@@ -34,6 +34,27 @@ def draw_people(frame, people):
             2
         )
 
+def draw_face_landmarks(frame, face_results):
+    h, w = frame.shape[:2]
+
+    for face in face_results:
+        landmarks = face.get("landmarks")
+
+        if not landmarks:
+            continue
+
+        for landmark in landmarks:
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
+
+            cv2.circle(
+                frame,
+                (x, y),
+                1,
+                (0, 255, 0),
+                -1
+            )
+
 def main():
     camera = open_camera(
         camera_index=0,
