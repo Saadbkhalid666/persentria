@@ -56,5 +56,6 @@ def process_frame(frame, timestamp_ms):
     return {
         "people": people,
         "events": events,
-        "faces": results
-    }
+        "faces": results,
+        "postures": postures
+}
