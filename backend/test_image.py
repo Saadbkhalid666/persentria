@@ -4,6 +4,30 @@ import time
 from inputs.image_input import load_image
 from processing.process_frame import process_frame
 
+def draw_people(frame, people):
+    for person in people:
+        x1, y1, x2, y2 = person["bbox"]
+        person_id = person["track_id"]
+
+        cv2.rectangle(
+            frame,
+            (x1, y1),
+            (x2, y2),
+            (0, 255, 0),
+            2
+        )
+
+        label = f"Person #{person_id}"
+
+        cv2.putText(
+            frame,
+            label,
+            (x1, y1 - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2
+        )
 
 def main():
 
@@ -19,6 +43,8 @@ def main():
         frame,
         timestamp_ms
     )
+    people = results["people"]
+    draw_people(frame, people)
 
     print(
         f"People detected: "
