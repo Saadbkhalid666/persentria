@@ -55,6 +55,27 @@ def draw_face_landmarks(frame, face_results):
                 -1
             )
 
+def draw_face_mesh(frame, faces):
+
+    height, width = frame.shape[:2]
+
+    for face in faces:
+
+        landmarks = face["landmarks"]
+
+        for landmark in landmarks:
+
+            x = int(landmark.x * width)
+            y = int(landmark.y * height)
+
+            cv2.circle(
+                frame,
+                (x, y),
+                1,
+                (0, 255, 0),
+                -1
+            )
+
 def main():
     camera = open_camera(
         camera_index=0,
