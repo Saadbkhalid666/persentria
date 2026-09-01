@@ -1,32 +1,42 @@
 from ultralytics import YOLO
 
-def load_model():
-    return YOLO("yolov11n.pt")
 
-def detect_car(model,frame, confidence=0.5):
-    results = model(frame,cof=confidence, verbose=false)
+MODEL_PATH = "yolo11n.pt"
+
+
+def load_car_model():
+    return YOLO(MODEL_PATH)
+
+
+def detect_cars(model, frame, confidence=0.5):
+
+    results = model(
+        frame,
+        conf=confidence,
+        classes=[2],  
+        verbose=False
+    )
 
     cars = []
 
     for result in results:
-        boxes = result.boxes
 
-        if not boxes:
+        if result.boxes is None:
             continue
 
-        for box in boxes:
-            class_id = int(box.cls[0])
-            score = fload(box.conf[0])
+        for box in result.boxes:
 
-            if class_id !=2:
-                continue
-            
-            x1,y1,x2,y2 = map(int, box.xyxy[0])
+            confidence_score = float(box.conf[0])
+
+            x1, y1, x2, y2 = map(
+                int,
+                box.xyxy[0]
+            )
 
             cars.append({
                 "class": "car",
-                "confidence": score,
-                "bbox": [x1,y1,x2,y2]
+                "confidence": confidence_score,
+                "bbox": [x1, y1, x2, y2]
             })
 
     return cars
