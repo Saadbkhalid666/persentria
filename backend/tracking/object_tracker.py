@@ -67,3 +67,15 @@ def detect_entry_exit(people):
         "entered": list(entered),
         "left": list(left)
     }
+
+
+def track_cars(model, frame, confidence=0.5):
+    results = model.track(
+        frame,
+        persist = True,
+        tracker = "bytrack.yml",
+        conf = confidence,
+        classes = [2],
+        verbose = False
+    )
+    
