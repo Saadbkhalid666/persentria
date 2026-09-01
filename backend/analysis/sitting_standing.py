@@ -1,15 +1,15 @@
 import os
 import math
 import cv2
+import mediapipe as mp
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-
 MODEL_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
     "models",
-    "pose_landmarker.task"
+    "pose_landmarker_full.task"
 )
 
 
@@ -88,11 +88,11 @@ def analyze_posture(
         cv2.COLOR_BGR2RGB
     )
 
-    mp_image = vision.MPImage(
-        image_format=vision.ImageFormat.SRGB,
+    mp_image = mp.Image(
+        image_format=mp.ImageFormat.SRGB,
         data=rgb_frame
     )
-
+    
     result = landmarker.detect_for_video(
         mp_image,
         timestamp_ms

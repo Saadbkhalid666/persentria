@@ -1,7 +1,7 @@
 import cv2
 import time
 
-from camera.camera import (
+from inputs.camera import (
     open_camera,
     read_frame,
     release_camera
@@ -33,6 +33,48 @@ def draw_people(frame, people):
             (0, 255, 0),
             2
         )
+
+def draw_face_landmarks(frame, face_results):
+    h, w = frame.shape[:2]
+
+    for face in face_results:
+        landmarks = face.get("landmarks")
+
+        if not landmarks:
+            continue
+
+        for landmark in landmarks:
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
+
+            cv2.circle(
+                frame,
+                (x, y),
+                1,
+                (0, 255, 0),
+                -1
+            )
+
+def draw_face_mesh(frame, faces):
+
+    height, width = frame.shape[:2]
+
+    for face in faces:
+
+        landmarks = face["landmarks"]
+
+        for landmark in landmarks:
+
+            x = int(landmark.x * width)
+            y = int(landmark.y * height)
+
+            cv2.circle(
+                frame,
+                (x, y),
+                1,
+                (0, 255, 0),
+                -1
+            )
 
 def main():
     camera = open_camera(
@@ -66,9 +108,13 @@ def main():
                     f"Eyes: {person['eye_state']['state']} | "
                     f"Blinks: {person['eye_state']['blink_count']} | "
                     f"Talking: {person['talking']['talking']} | "
-                    f"Mouth: {person['talking']['mouth_ratio']:.3f} | "
-                    f"Posture: {person['state']}"    
+                    f"Mouth: {person['talking']['mouth_ratio']:.3f}"
                 )
+
+            for posture in results["postures"]:
+                print(
+                    f"Posture: {posture['state']}"
+                )   
 
             cv2.putText(
                 frame,

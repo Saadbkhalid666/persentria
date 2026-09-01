@@ -4,18 +4,33 @@ from detection.face_analyzer import create_face_landmarker, analyze_faces
 from analysis.face_person_matcher import match_faces_to_people
 from analysis.eye_state import get_eye_state
 from analysis.talking import detect_talking
-from analysis.sitting_standing import analyze_posture, create_pose_landmarker
+from analysis.sitting_standing import (
+    analyze_posture,
+    create_pose_landmarker
+)
 
 
 model = load_model()
 landmarker = create_face_landmarker()
 pose_landmarker = create_pose_landmarker()
 
-def process_frame(frame, timestamp_ms):
-    people = track_people(model, frame)
-    postures = analyze_posture(pose_landmarker, frame, timestamp_ms)
 
-    events = detect_entry_exit(people)
+def process_frame(frame, timestamp_ms):
+
+    people = track_people(
+        model,
+        frame
+    )
+
+    postures = analyze_posture(
+        pose_landmarker,
+        frame,
+        timestamp_ms
+    )
+
+    events = detect_entry_exit(
+        people
+    )
 
     face_result = analyze_faces(
         landmarker,
@@ -33,6 +48,7 @@ def process_frame(frame, timestamp_ms):
     results = []
 
     for match in matches:
+
         person_id = match["person_id"]
         face_landmarks = match["landmarks"]
 
@@ -50,11 +66,13 @@ def process_frame(frame, timestamp_ms):
             "person_id": person_id,
             "eye_state": eye_state,
             "talking": talking,
-            "face_center": match["face_center"]
+            "face_center": match["face_center"],
+            "landmarks": face_landmarks
         })
 
     return {
         "people": people,
         "events": events,
-        "faces": results
+        "faces": results,
+        "postures": postures
     }
