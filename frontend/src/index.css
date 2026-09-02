@@ -18,9 +18,15 @@
     background-color: var(--bg-dark);
     color: var(--text-primary);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    overflow-x: hidden;
+    overflow: hidden;
     margin: 0;
     padding: 0;
+    height: 100vh;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
   }
 }
 
@@ -67,3 +73,23 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* Custom scroll helper */
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+

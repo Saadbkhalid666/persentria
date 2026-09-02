@@ -1,304 +1,180 @@
 import React, { useState } from 'react';
-import { Folder, UploadCloud, Search, Eye, Sparkles, CheckCircle2, AlertTriangle, Users, Car, RefreshCw, X } from 'lucide-react';
-import { scanPersonDirectory, scanVehicleDirectory, uploadPersonImage, uploadVehicleImage } from '../lib/api';
+import { FolderOpen, Search, CheckCircle, AlertCircle, Loader, ChevronDown, ChevronUp, Car, Users, Eye } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
+import { scanPersonDirectory, scanVehicleDirectory } from '../lib/api';
 
 export default function DirectoryScanner({ mode, onScanResults, isScanning, setIsScanning }) {
-  const [dirPath, setDirPath] = useState('d:\\persentria\\backend');
-  const [error, setError] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [resultsData, setResultsData] = useState(null);
-  const [uploadMode, setUploadMode] = useState(false);
-  const [aiRecognition, setAiRecognition] = useState(true);
+  const [dirPath, setDirPath]       = useState('');
+  const [error, setError]           = useState(null);
+  const [results, setResults]       = useState(null);
+  const [expanded, setExpanded]     = useState(null); // image name
+  const [useAI, setUseAI]           = useState(true);
+  const [progress, setProgress]     = useState('');
+
+  const isTraffic = mode === PROJECT_MODES.TRAFFIC;
 
   const handleScan = async () => {
-    if (!dirPath.trim()) return;
-    setIsScanning(true);
+    if (!dirPath.trim()) { setError('Please enter a directory path.'); return; }
     setError(null);
+    setResults(null);
+    setIsScanning(true);
+    setProgress('Sending scan request…');
 
     try {
-      let data;
-      if (mode === PROJECT_MODES.ROOM) {
-        data = await scanPersonDirectory(dirPath);
-      } else {
-        data = await scanVehicleDirectory(dirPath, aiRecognition);
-      }
-      setResultsData(data);
-      if (onScanResults) onScanResults(data);
+      const data = isTraffic
+        ? await scanVehicleDirectory(dirPath.trim(), useAI)
+        : await scanPersonDirectory(dirPath.trim());
+
+      setResults(data);
+      onScanResults(data);
+      setProgress('');
     } catch (err) {
-      setError(err.message || 'Failed to scan directory');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsScanning(true);
-    setError(null);
-
-    try {
-      let data;
-      if (mode === PROJECT_MODES.ROOM) {
-        data = await uploadPersonImage(file);
-      } else {
-        data = await uploadVehicleImage(file);
-      }
-      setSelectedItem(data);
-    } catch (err) {
-      setError(err.message || 'Failed to process uploaded file');
+      setError(err.message || 'Scan failed. Check directory path and backend.');
+      setProgress('');
     } finally {
       setIsScanning(false);
     }
   };
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-5 shadow-2xl flex flex-col gap-5">
-      {/* Header Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-            {mode === PROJECT_MODES.ROOM ? <Users className="w-5 h-5" /> : <Car className="w-5 h-5" />}
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-white tracking-wide">
-              {mode === PROJECT_MODES.ROOM ? 'Person Batch Directory Scanner' : 'Vehicle Recognition Directory Scanner'}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {mode === PROJECT_MODES.ROOM
-                ? 'Scan local images for people tracking, eye state, talking & posture'
-                : 'Scan vehicle images with YOLO tracking and Gemma Multimodal AI Make/Model recognition'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setUploadMode(!uploadMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-              uploadMode
-                ? 'bg-violet-600 text-white border-violet-500'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-            }`}
-          >
-            <UploadCloud className="w-3.5 h-3.5" />
-            {uploadMode ? 'Switch to Directory' : 'Upload Single Image'}
-          </button>
-        </div>
+    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-5 flex flex-col gap-4 h-full shadow-2xl overflow-y-auto">
+      {/* Header */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <div className="w-2 h-2 rounded-full bg-violet-400" />
+        <FolderOpen className="w-4 h-4 text-violet-400" />
+        <span className="text-xs font-bold text-white font-mono tracking-wide">
+          {isTraffic ? 'VEHICLE DIRECTORY SCAN' : 'PERSON DIRECTORY SCAN'}
+        </span>
       </div>
 
-      {/* Directory Path Input or File Upload */}
-      {!uploadMode ? (
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="relative flex-1">
-            <Folder className="w-4 h-4 text-cyan-400 absolute left-3.5 top-3" />
+      {/* Input */}
+      <div className="space-y-3">
+        <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+          Directory Path
+        </label>
+        <input
+          type="text"
+          value={dirPath}
+          onChange={(e) => setDirPath(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleScan()}
+          placeholder={isTraffic ? 'C:\\images\\vehicles' : 'C:\\images\\people'}
+          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition"
+          disabled={isScanning}
+        />
+
+        {isTraffic && (
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
             <input
-              type="text"
-              value={dirPath}
-              onChange={(e) => setDirPath(e.target.value)}
-              placeholder="e.g. d:\persentria\backend or C:\images"
-              className="w-full bg-slate-950/80 border border-slate-700/80 focus:border-cyan-500 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-100 font-mono focus:outline-none transition"
+              type="checkbox"
+              checked={useAI}
+              onChange={(e) => setUseAI(e.target.checked)}
+              className="accent-cyan-500"
+              disabled={isScanning}
             />
-          </div>
-
-          {mode === PROJECT_MODES.TRAFFIC && (
-            <label className="flex items-center gap-2 text-xs text-slate-300 px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl cursor-pointer">
-              <input
-                type="checkbox"
-                checked={aiRecognition}
-                onChange={(e) => setAiRecognition(e.target.checked)}
-                className="rounded accent-cyan-500"
-              />
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              AI Make/Model Recognition
-            </label>
-          )}
-
-          <button
-            onClick={handleScan}
-            disabled={isScanning}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-500/20 disabled:opacity-50"
-          >
-            {isScanning ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Scanning...
-              </>
-            ) : (
-              <>
-                <Search className="w-4 h-4" />
-                Scan Directory
-              </>
-            )}
-          </button>
-        </div>
-      ) : (
-        <div className="border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-2xl p-6 text-center bg-slate-950/40 transition flex flex-col items-center justify-center">
-          <UploadCloud className="w-8 h-8 text-cyan-400 mb-2" />
-          <p className="text-xs text-slate-300 font-medium mb-1">Drag and drop or select an image to inspect</p>
-          <p className="text-[10px] text-slate-500 mb-3">Supports JPG, PNG, WEBP</p>
-          <label className="cursor-pointer px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-cyan-400 font-semibold transition">
-            Choose File
-            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+            Enable Gemma AI Vehicle Recognition (brand + model)
           </label>
+        )}
+
+        <button
+          onClick={handleScan}
+          disabled={isScanning || !dirPath.trim()}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition
+            bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500
+            disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20"
+        >
+          {isScanning
+            ? <><Loader className="w-4 h-4 animate-spin" /> Scanning…</>
+            : <><Search className="w-4 h-4" /> Start Scan</>
+          }
+        </button>
+      </div>
+
+      {/* Progress */}
+      {progress && (
+        <div className="flex items-center gap-2 text-xs text-cyan-400 font-mono">
+          <Loader className="w-3 h-3 animate-spin" /> {progress}
         </div>
       )}
 
-      {/* Error notification */}
+      {/* Error */}
       {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+        <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-mono">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Results Summary Bar */}
-      {resultsData && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-mono">Images Processed</div>
-            <div className="text-lg font-bold text-white font-mono">{resultsData.total_images || 0}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-mono">
-              {mode === PROJECT_MODES.ROOM ? 'People Detected' : 'Vehicles Detected'}
-            </div>
-            <div className="text-lg font-bold text-cyan-400 font-mono">
-              {mode === PROJECT_MODES.ROOM ? resultsData.total_people_detected : resultsData.total_vehicles_detected}
-            </div>
-          </div>
-          {mode === PROJECT_MODES.ROOM ? (
-            <>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">Talking Active</div>
-                <div className="text-lg font-bold text-violet-400 font-mono">{resultsData.total_talking || 0}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">Drowsiness Risks</div>
-                <div className="text-lg font-bold text-red-400 font-mono">{resultsData.total_drowsy || 0}</div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">AI Recognized</div>
-                <div className="text-lg font-bold text-emerald-400 font-mono">
-                  {resultsData.vehicles?.filter((v) => v.make && v.make !== 'Vehicle').length || 0}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-mono">Recognition Engine</div>
-                <div className="text-xs font-bold text-amber-400 font-mono mt-1">Gemma-4 Multimodal</div>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Gallery Grid */}
-      {resultsData && resultsData.results && resultsData.results.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>Detection Gallery ({resultsData.results.length} items)</span>
-            <span className="text-[10px] text-slate-500">Click any card to inspect full resolution</span>
+      {/* Results summary */}
+      {results && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-mono">
+            <CheckCircle className="w-4 h-4 shrink-0" />
+            <span>
+              Scanned <b>{results.total_images}</b> images ·{' '}
+              {isTraffic
+                ? <><b>{results.total_vehicles_detected}</b> vehicles detected</>
+                : <><b>{results.total_people_detected}</b> persons · <b>{results.total_talking}</b> talking · <b>{results.total_drowsy}</b> drowsy</>
+              }
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[480px] overflow-y-auto pr-1">
-            {resultsData.results.map((item, idx) => (
-              <div
-                key={idx}
-                onClick={() => setSelectedItem(item)}
-                className="group relative bg-slate-950/70 border border-slate-800 hover:border-cyan-500/50 rounded-xl overflow-hidden cursor-pointer transition shadow-sm hover:shadow-cyan-500/10"
-              >
-                <div className="aspect-video w-full bg-black/40 overflow-hidden relative">
-                  <img
-                    src={item.thumbnail}
-                    alt={item.filename}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30">
-                    {mode === PROJECT_MODES.ROOM
-                      ? `${item.people_count || 0} People`
-                      : `${item.vehicle_count || 0} Vehicles`}
+          {/* Per-image accordion */}
+          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 custom-scroll">
+            {results.results?.map((r) => (
+              <div key={r.filename} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                {/* row header */}
+                <button
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-300 hover:bg-slate-800/50 transition"
+                  onClick={() => setExpanded(expanded === r.filename ? null : r.filename)}
+                >
+                  <div className="flex items-center gap-2 font-mono">
+                    {isTraffic ? <Car className="w-3.5 h-3.5 text-cyan-400" /> : <Users className="w-3.5 h-3.5 text-violet-400" />}
+                    <span className="text-slate-400 truncate max-w-[140px]">{r.filename}</span>
+                    <span className="text-slate-600">
+                      {isTraffic ? `${r.vehicle_count} vehicle(s)` : `${r.people_count} person(s)`}
+                    </span>
                   </div>
-                </div>
+                  {expanded === r.filename ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
 
-                <div className="p-2.5">
-                  <div className="text-xs font-semibold text-slate-200 truncate">{item.filename}</div>
-                  {mode === PROJECT_MODES.TRAFFIC && item.vehicles && item.vehicles.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {item.vehicles.map((v, i) => (
-                        <span
-                          key={i}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800"
-                        >
-                          {v.brand_model || `Car #${v.id}`}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* expanded detail */}
+                {expanded === r.filename && (
+                  <div className="px-3 pb-3 space-y-2">
+                    {r.thumbnail && (
+                      <img src={r.thumbnail} alt={r.filename} className="w-full rounded-lg object-cover border border-slate-700 max-h-36" />
+                    )}
+
+                    {isTraffic
+                      ? r.vehicles?.map((v, i) => (
+                          <div key={i} className="flex items-start gap-3 bg-slate-900/50 rounded-lg p-2">
+                            {v.crop && (
+                              <img src={v.crop} alt="crop" className="w-14 h-12 object-cover rounded border border-slate-700 shrink-0" />
+                            )}
+                            <div className="text-[10px] font-mono space-y-0.5">
+                              <div className="text-cyan-300 font-bold">{v.brand || 'Unknown'} {v.model || ''}</div>
+                              <div className="text-slate-500">Type: {v.type || 'Car'}</div>
+                              <div className="text-slate-500">Confidence: {v.confidence || '–'}</div>
+                            </div>
+                          </div>
+                        ))
+                      : r.people?.map((p, i) => (
+                          <div key={i} className="flex items-center gap-3 bg-slate-900/50 rounded-lg p-2 text-[10px] font-mono">
+                            <Users className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                            <div className="space-y-0.5">
+                              <div className="text-white font-bold">Person #{p.id}</div>
+                              <div className="text-slate-400">
+                                {p.talking ? '🗣 Talking' : '🔇 Silent'} ·{' '}
+                                {p.eyes === 'closed' ? '👁 Closed' : '👁 Open'} ·{' '}
+                                {p.drowsiness !== 'normal' ? '⚠ Drowsy' : '✅ Normal'}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                    }
+                  </div>
+                )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Inspector Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-cyan-400" />
-                <h3 className="font-bold text-sm text-white">{selectedItem.filename || 'Processed Image Preview'}</h3>
-              </div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              <div className="rounded-xl overflow-hidden border border-slate-800 bg-black flex items-center justify-center">
-                <img
-                  src={selectedItem.thumbnail || selectedItem.annotated_image}
-                  alt="Detection preview"
-                  className="max-h-[450px] w-auto object-contain"
-                />
-              </div>
-
-              {/* Vehicle AI detail if present */}
-              {selectedItem.vehicles && selectedItem.vehicles.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    Detected Vehicles & AI Classification
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedItem.vehicles.map((v, i) => (
-                      <div key={i} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-start gap-3">
-                        {v.crop && (
-                          <img src={v.crop} alt="Vehicle crop" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-cyan-400">{v.brand_model || `Vehicle #${v.id}`}</div>
-                          <div className="text-[11px] text-slate-400">Type: {v.type}</div>
-                          {v.ai_raw_output && (
-                            <div className="mt-1 text-[10px] text-slate-500 font-mono whitespace-pre-line line-clamp-3 bg-slate-900 p-1.5 rounded">
-                              {v.ai_raw_output}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
