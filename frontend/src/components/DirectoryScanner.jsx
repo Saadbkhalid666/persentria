@@ -153,7 +153,7 @@ export default function DirectoryScanner({ mode, onScanResults, isScanning, setI
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 ${
+            className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
               dragOver
                 ? 'border-cyan-400 bg-cyan-500/10'
                 : selectedFiles.length > 0
@@ -161,15 +161,15 @@ export default function DirectoryScanner({ mode, onScanResults, isScanning, setI
                 : 'border-slate-700 hover:border-slate-500 bg-slate-950/60'
             }`}
           >
-            <div className="w-12 h-12 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-cyan-400">
-              <UploadCloud className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-cyan-400">
+              <UploadCloud className="w-5 h-5" />
             </div>
             {selectedFiles.length > 0 ? (
               <div>
                 <p className="text-sm font-semibold text-emerald-400 font-mono">
                   ✓ {selectedFiles.length} image(s) selected
                 </p>
-                <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                <p className="text-[10px] text-slate-400 font-mono">
                   Click to replace or add more files
                 </p>
               </div>
@@ -178,7 +178,7 @@ export default function DirectoryScanner({ mode, onScanResults, isScanning, setI
                 <p className="text-sm font-semibold text-slate-200">
                   Select images from gallery or drop files here
                 </p>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                <p className="text-[11px] text-slate-500 font-mono">
                   Supports JPG, PNG, WebP (Single or Multi-select)
                 </p>
               </div>
