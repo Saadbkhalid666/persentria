@@ -1,5 +1,6 @@
 import cv2
 import time
+import base64
 
 from inputs.camera import (
     open_camera,
@@ -9,6 +10,15 @@ from inputs.camera import (
 
 from processing.process_frame import process_frame
 from analysis.vehicle_recognition import recognize_vehicle
+
+
+# Stores vehicle recognition results
+# Example:
+# {
+#     1: "Brand: Toyota\nModel: Corolla..."
+# }
+vehicle_cache = {}
+
 
 def encode_car_crop(frame, bbox):
     x1, y1, x2, y2 = bbox
@@ -28,10 +38,15 @@ def encode_car_crop(frame, bbox):
     if not success:
         return None
 
-    return base64.b64encode(buffer).decode("utf-8")
+    return base64.b64encode(
+        buffer
+    ).decode("utf-8")
+
 
 def draw_people(frame, people):
+
     for person in people:
+
         x1, y1, x2, y2 = person["bbox"]
         person_id = person["track_id"]
 
@@ -55,7 +70,8 @@ def draw_people(frame, people):
             2
         )
 
-def draw_cars(frame, cars):
+
+def draw_cars(frame, cars, vehicle_cache):
 
     for car in cars:
 
@@ -70,36 +86,32 @@ def draw_cars(frame, cars):
             2
         )
 
+        # Default label
+        label = f"Car #{car_id}"
+
+        # Add recognized vehicle information
+        if car_id in vehicle_cache:
+
+            vehicle_result = vehicle_cache[car_id]
+
+            # Keep the API response on one line
+            vehicle_result = vehicle_result.replace(
+                "\n",
+                " | "
+            )
+
+            label = f"Car #{car_id} | {vehicle_result}"
+
         cv2.putText(
             frame,
-            f"Car #{car_id}",
-            (x1, y1 - 10),
+            label,
+            (x1, max(25, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
+            0.55,
             (255, 0, 0),
             2
         )
 
-def draw_face_landmarks(frame, face_results):
-    h, w = frame.shape[:2]
-
-    for face in face_results:
-        landmarks = face.get("landmarks")
-
-        if not landmarks:
-            continue
-
-        for landmark in landmarks:
-            x = int(landmark.x * w)
-            y = int(landmark.y * h)
-
-            cv2.circle(
-                frame,
-                (x, y),
-                1,
-                (0, 255, 0),
-                -1
-            )
 
 def draw_face_mesh(frame, faces):
 
@@ -107,7 +119,10 @@ def draw_face_mesh(frame, faces):
 
     for face in faces:
 
-        landmarks = face["landmarks"]
+        landmarks = face.get("landmarks")
+
+        if not landmarks:
+            continue
 
         for landmark in landmarks:
 
@@ -122,7 +137,9 @@ def draw_face_mesh(frame, faces):
                 -1
             )
 
+
 def main():
+
     camera = open_camera(
         camera_index=0,
         width=1280,
@@ -133,7 +150,9 @@ def main():
     start_time = time.monotonic()
 
     try:
+
         while True:
+
             frame = read_frame(camera)
 
             timestamp_ms = int(
@@ -145,25 +164,108 @@ def main():
                 timestamp_ms
             )
 
+            # --------------------------------
+            # PEOPLE
+            # --------------------------------
+
             people = results["people"]
-            draw_people(frame, people)
+
+            draw_people(
+                frame,
+                people
+            )
+
+            # --------------------------------
+            # CARS
+            # --------------------------------
 
             cars = results["cars"]
-            draw_cars(frame, cars)
 
-            for person in results["faces"]:
-                print(
-                    f"Person #{person['person_id']} | "
-                    f"Eyes: {person['eye_state']['state']} | "
-                    f"Blinks: {person['eye_state']['blink_count']} | "
-                    f"Talking: {person['talking']['talking']} | "
-                    f"Mouth: {person['talking']['mouth_ratio']:.3f}"
+            # Recognize only NEW cars
+            for car in cars:
+
+                car_id = car["track_id"]
+
+                # Already recognized
+                if car_id in vehicle_cache:
+                    continue
+
+                image_base64 = encode_car_crop(
+                    frame,
+                    car["bbox"]
                 )
 
+                if image_base64 is None:
+                    continue
+
+                print(
+                    f"\nRecognizing Car #{car_id}..."
+                )
+
+                try:
+
+                    vehicle_result = recognize_vehicle(
+                        image_base64
+                    )
+
+                    vehicle_cache[car_id] = (
+                        vehicle_result
+                    )
+
+                    print(
+                        f"Car #{car_id} | "
+                        f"{vehicle_result}"
+                    )
+
+                except Exception as e:
+
+                    print(
+                        f"Vehicle recognition failed "
+                        f"for Car #{car_id}: {e}"
+                    )
+
+            draw_cars(
+                frame,
+                cars,
+                vehicle_cache
+            )
+
+            # --------------------------------
+            # FACES
+            # --------------------------------
+
+            draw_face_mesh(
+                frame,
+                results["faces"]
+            )
+
+            for person in results["faces"]:
+
+                print(
+                    f"Person #{person['person_id']} | "
+                    f"Eyes: "
+                    f"{person['eye_state']['state']} | "
+                    f"Blinks: "
+                    f"{person['eye_state']['blink_count']} | "
+                    f"Talking: "
+                    f"{person['talking']['talking']} | "
+                    f"Mouth: "
+                    f"{person['talking']['mouth_ratio']:.3f}"
+                )
+
+            # --------------------------------
+            # POSTURE
+            # --------------------------------
+
             for posture in results["postures"]:
+
                 print(
                     f"Posture: {posture['state']}"
-                )   
+                )
+
+            # --------------------------------
+            # COUNTERS
+            # --------------------------------
 
             cv2.putText(
                 frame,
@@ -174,6 +276,7 @@ def main():
                 (0, 255, 0),
                 2
             )
+
             cv2.putText(
                 frame,
                 f"Cars: {len(cars)}",
@@ -184,13 +287,22 @@ def main():
                 2
             )
 
-            cv2.imshow("Persentria", frame)
+            # --------------------------------
+            # DISPLAY
+            # --------------------------------
+
+            cv2.imshow(
+                "Persentria",
+                frame
+            )
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
     finally:
+
         release_camera(camera)
+
         cv2.destroyAllWindows()
 
 
