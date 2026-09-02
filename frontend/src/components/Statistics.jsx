@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MessageSquare, AlertTriangle, Cpu, Gauge, Eye, Activity, Sparkles } from 'lucide-react';
+import { Users, MessageSquare, AlertTriangle, Cpu, Gauge, Activity } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
 
 export default function Statistics({ data, mode }) {
@@ -11,13 +11,13 @@ export default function Statistics({ data, mode }) {
         {
           title: 'Total Vehicles',
           value: data?.vehicles_count || data?.vehicles?.length || 0,
-          sub: 'Live ByteTrack Feed',
+          sub: 'Live Detection Count',
           icon: Gauge,
           color: 'cyan'
         },
         {
           title: 'Average Speed',
-          value: `${stats.avgSpeed || 50} km/h`,
+          value: stats.avgSpeed ? `${stats.avgSpeed} km/h` : '0 km/h',
           sub: 'Spatial Vector Model',
           icon: Activity,
           color: 'emerald'
@@ -31,8 +31,8 @@ export default function Statistics({ data, mode }) {
         },
         {
           title: 'AI Processing FPS',
-          value: `${data?.fps || 30} FPS`,
-          sub: `${data?.latencyMs || 15}ms Neural Latency`,
+          value: data ? `${data.fps || 0} FPS` : '0 FPS',
+          sub: data ? `${data.latencyMs || 0}ms Latency` : 'Waiting for input',
           icon: Cpu,
           color: 'violet'
         }
@@ -74,43 +74,37 @@ export default function Statistics({ data, mode }) {
         return {
           bg: 'bg-cyan-500/10',
           text: 'text-cyan-400',
-          border: 'border-cyan-500/20',
-          shadow: 'shadow-cyan-500/10'
+          border: 'border-cyan-500/20'
         };
       case 'violet':
         return {
           bg: 'bg-violet-500/10',
           text: 'text-violet-400',
-          border: 'border-violet-500/20',
-          shadow: 'shadow-violet-500/10'
+          border: 'border-violet-500/20'
         };
       case 'emerald':
         return {
           bg: 'bg-emerald-500/10',
           text: 'text-emerald-400',
-          border: 'border-emerald-500/20',
-          shadow: 'shadow-emerald-500/10'
+          border: 'border-emerald-500/20'
         };
       case 'red':
         return {
           bg: 'bg-red-500/10',
           text: 'text-red-400',
-          border: 'border-red-500/20',
-          shadow: 'shadow-red-500/10'
+          border: 'border-red-500/20'
         };
       case 'amber':
         return {
           bg: 'bg-amber-500/10',
           text: 'text-amber-400',
-          border: 'border-amber-500/20',
-          shadow: 'shadow-amber-500/10'
+          border: 'border-amber-500/20'
         };
       default:
         return {
           bg: 'bg-slate-800/40',
           text: 'text-slate-300',
-          border: 'border-slate-800',
-          shadow: 'shadow-none'
+          border: 'border-slate-800'
         };
     }
   };
@@ -124,7 +118,7 @@ export default function Statistics({ data, mode }) {
         return (
           <div
             key={idx}
-            className={`bg-slate-900/90 border border-slate-800/80 backdrop-blur-xl rounded-2xl p-4 shadow-xl flex items-center justify-between transition-all hover:border-slate-700`}
+            className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-xl rounded-2xl p-4 shadow-xl flex items-center justify-between transition-all hover:border-slate-700"
           >
             <div>
               <p className="text-xs text-slate-400 font-medium">{card.title}</p>

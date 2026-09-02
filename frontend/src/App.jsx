@@ -19,7 +19,7 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [isScanning, setIsScanning] = useState(false);
 
-  // Check Flask Backend Health
+  // Periodic Backend Health Check
   const pingBackend = useCallback(async () => {
     const health = await checkBackendHealth();
     setIsBackendOnline(health.online);
@@ -27,32 +27,31 @@ export default function App() {
 
   useEffect(() => {
     pingBackend();
-    const interval = setInterval(pingBackend, 5000);
+    const interval = setInterval(pingBackend, 4000);
     return () => clearInterval(interval);
   }, [pingBackend]);
 
-  // Connect & listen to WebSocket / Fallback Simulation
+  // WebSocket for optional live broadcast
   useEffect(() => {
     visionWS.connect();
 
     const unsubscribe = visionWS.subscribe((msg) => {
-      if (msg.type === 'DATA') {
-        // If not using live webcam backend inference, update telemetry from simulated data
-        if (!isBackendOnline || activeSubTab !== 'webcam') {
-          setTelemetry((prev) => (isScanning ? prev : msg.payload));
-          if (msg.payload.events && msg.payload.events.length > 0) {
-            setEvents((prev) => [...msg.payload.events, ...prev].slice(0, 50));
-          }
+      if (msg.type === 'DATA' && msg.payload) {
+        setTelemetry(msg.payload);
+        if (msg.payload.events && msg.payload.events.length > 0) {
+          setEvents((prev) => [...msg.payload.events, ...prev].slice(0, 50));
         }
       }
     });
 
     return () => unsubscribe();
-  }, [isBackendOnline, activeSubTab, isScanning]);
+  }, []);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
     visionWS.setMode(newMode);
+    // Reset telemetry on mode switch so only relevant data is shown
+    setTelemetry(null);
     if (newMode === PROJECT_MODES.TRAFFIC && activeSubTab === 'webcam') {
       setActiveSubTab('directory');
     }
@@ -73,22 +72,26 @@ export default function App() {
       });
 
       setTelemetry({
-        people_count: scanData.total_people_detected,
+        people_count: scanData.total_people_detected || 0,
         people: allFoundPeople,
+        fps: 30,
+        latencyMs: 12,
         stats: {
-          talkingCount: scanData.total_talking,
-          drowsyCount: scanData.total_drowsy,
+          talkingCount: scanData.total_talking || 0,
+          drowsyCount: scanData.total_drowsy || 0,
           sittingCount: allFoundPeople.filter((p) => p.posture === 'sitting').length,
           standingCount: allFoundPeople.filter((p) => p.posture === 'standing').length
         }
       });
     } else {
       setTelemetry({
-        vehicles_count: scanData.total_vehicles_detected,
+        vehicles_count: scanData.total_vehicles_detected || 0,
         vehicles: scanData.vehicles || [],
+        fps: 30,
+        latencyMs: 12,
         stats: {
-          totalVehicles: scanData.total_vehicles_detected,
-          avgSpeed: 54,
+          totalVehicles: scanData.total_vehicles_detected || 0,
+          avgSpeed: 0,
           speedWarnings: 0
         }
       });
@@ -99,7 +102,7 @@ export default function App() {
         id: `scan-${Date.now()}`,
         timestamp: new Date().toLocaleTimeString(),
         type: 'DIRECTORY_SCAN_COMPLETED',
-        message: `Successfully scanned directory: ${scanData.directory} (${scanData.total_images} images)`
+        message: `Scanned directory ${scanData.directory} (${scanData.total_images} images processed)`
       },
       ...prev
     ]);

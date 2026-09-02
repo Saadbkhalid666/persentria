@@ -6,41 +6,33 @@ import base64
 import cv2
 import numpy as np
 from pathlib import Path
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-
-# Load .env manually if needed
-env_path = Path(__file__).resolve().parent.parent / ".env"
-if env_path.exists():
-    with open(env_path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ[k.strip()] = v.strip()
 
 # Add backend directory to sys.path
 backend_dir = str(Path(__file__).resolve().parent.parent)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+# Ensure .env is loaded
+env_path = Path(backend_dir) / ".env"
+if env_path.exists():
+    with open(env_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
 # Import existing backend modules
 from processing.process_frame import process_frame
 from inputs.image_input import load_image
-from inputs.camera import open_camera, read_frame, release_camera
-from detection.person_detector import load_model, detect_people
-from detection.car_detector import load_car_model, detect_cars
+from detection.person_detector import load_model
 from tracking.object_tracker import track_people, track_cars, detect_entry_exit
 from analysis.vehicle_recognition import recognize_vehicle
-from analysis.eye_state import get_eye_state
-from analysis.talking import detect_talking
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
-# Global state for webcam streaming
-camera_instance = None
-camera_active = False
 
 def encode_image_base64(image_np, quality=80):
     success, buffer = cv2.imencode(".jpg", image_np, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
@@ -55,20 +47,49 @@ def decode_image_base64(base64_str):
     np_arr = np.frombuffer(image_bytes, np.uint8)
     return cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
+def parse_ai_vehicle_result(ai_text):
+    """
+    Parses LLM output into clean company/make, model, type, and confidence.
+    """
+    brand = "Vehicle"
+    model = ""
+    vtype = "Car"
+    confidence = "High"
+    
+    if not ai_text:
+        return brand, model, vtype, confidence
+
+    for line in ai_text.splitlines():
+        clean_line = line.replace("*", "").replace("-", "").strip()
+        lower_line = clean_line.lower()
+        if "brand:" in lower_line or "make:" in lower_line or "company:" in lower_line:
+            val = clean_line.split(":", 1)[1].strip()
+            if val.lower() not in ["unknown", "n/a", "none", "..."]:
+                brand = val
+        elif "model:" in lower_line:
+            val = clean_line.split(":", 1)[1].strip()
+            if val.lower() not in ["unknown", "n/a", "none", "..."]:
+                model = val
+        elif "type:" in lower_line:
+            val = clean_line.split(":", 1)[1].strip()
+            if val.lower() not in ["unknown", "n/a", "none", "..."]:
+                vtype = val
+        elif "confidence:" in lower_line:
+            val = clean_line.split(":", 1)[1].strip()
+            if val.lower() not in ["unknown", "n/a", "none", "..."]:
+                confidence = val
+
+    return brand, model, vtype, confidence
+
 def draw_person_annotations(frame, people, faces=None, postures=None):
     annotated = frame.copy()
-    h, w = annotated.shape[:2]
-
-    # Map face data by person_id
     face_map = {f["person_id"]: f for f in (faces or [])}
     
-    # Draw people bounding boxes & state tags
     for person in people:
         x1, y1, x2, y2 = person["bbox"]
         pid = person["track_id"]
         face_info = face_map.get(pid, {})
         
-        # Color based on state
         is_drowsy = face_info.get("eye_state", {}).get("state") == "closed"
         is_talking = face_info.get("talking", {}).get("talking", False)
         
@@ -81,13 +102,10 @@ def draw_person_annotations(frame, people, faces=None, postures=None):
         elif is_talking:
             tag_text += " [TALKING]"
             
-        cv2.putText(annotated, tag_text, (x1, max(20, y1 - 10)),
+        (tw, th), _ = cv2.getTextSize(tag_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+        cv2.rectangle(annotated, (x1, max(0, y1 - 22)), (x1 + tw + 6, max(22, y1)), (0, 0, 0), -1)
+        cv2.putText(annotated, tag_text, (x1 + 3, max(16, y1 - 6)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
-        
-        # Draw face center if available
-        if "face_center" in face_info:
-            fx, fy = face_info["face_center"]
-            cv2.circle(annotated, (fx, fy), 4, (0, 255, 255), -1)
 
     return annotated
 
@@ -100,21 +118,24 @@ def draw_vehicle_annotations(frame, cars, vehicle_catalog=None):
         cid = car["track_id"]
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 200, 0), 2)
         
-        label = f"Car #{cid}"
-        if cid in catalog:
-            brand_model = catalog[cid].get("brand_model", "")
-            if brand_model:
-                label += f": {brand_model}"
+        info = catalog.get(cid, {})
+        brand = info.get("make", "")
+        model = info.get("model", "")
+        if brand and brand != "Vehicle":
+            label = f"{brand} {model}".strip()
+        else:
+            label = f"Car #{cid}"
                 
-        cv2.putText(annotated, label, (x1, max(20, y1 - 10)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 200, 0), 2)
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+        cv2.rectangle(annotated, (x1, max(0, y1 - 22)), (x1 + tw + 6, max(22, y1)), (0, 0, 0), -1)
+        cv2.putText(annotated, label, (x1 + 3, max(16, y1 - 6)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
 
     return annotated
 
 def serialize_landmarks(landmarks):
     if not landmarks:
         return []
-    # Sample down landmarks for efficient transmission
     result = []
     for lm in landmarks:
         if hasattr(lm, "x") and hasattr(lm, "y"):
@@ -148,14 +169,12 @@ def api_process_person_frame():
         if frame is None:
             return jsonify({"error": "Failed to decode frame"}), 400
 
-        # Execute existing pipeline
         results = process_frame(frame, timestamp_ms)
         people = results.get("people", [])
         faces = results.get("faces", [])
         postures = results.get("postures", [])
         events = results.get("events", {"entered": [], "left": []})
 
-        # Format people telemetry
         formatted_people = []
         face_map = {f["person_id"]: f for f in faces}
 
@@ -166,7 +185,6 @@ def api_process_person_frame():
             eye_info = face.get("eye_state", {})
             talk_info = face.get("talking", {})
 
-            # Match posture if available
             posture_state = "unknown"
             if postures:
                 posture_state = postures[0].get("state", "unknown")
@@ -178,7 +196,7 @@ def api_process_person_frame():
             formatted_people.append({
                 "id": pid,
                 "name": f"Track #{pid}",
-                "bbox": [x1, y1, x2 - x1, y2 - y1],  # [x, y, w, h] for canvas
+                "bbox": [x1, y1, x2 - x1, y2 - y1],
                 "raw_bbox": [x1, y1, x2, y2],
                 "talking": is_talking,
                 "smiling": False,
@@ -193,7 +211,6 @@ def api_process_person_frame():
                 "faceLandmarks": serialize_landmarks(face.get("landmarks", []))[:30]
             })
 
-        # Generate event items
         generated_events = []
         for entered_id in events.get("entered", []):
             generated_events.append({
@@ -212,7 +229,6 @@ def api_process_person_frame():
                 "person_id": left_id
             })
 
-        # Calculate statistics
         stats = {
             "talkingCount": sum(1 for p in formatted_people if p["talking"]),
             "drowsyCount": sum(1 for p in formatted_people if p["drowsiness"] != "normal"),
@@ -221,7 +237,6 @@ def api_process_person_frame():
             "movingCount": sum(1 for p in formatted_people if p["movement"] == "moving")
         }
 
-        # Create annotated image preview
         annotated_frame = draw_person_annotations(frame, people, faces, postures)
         annotated_b64 = encode_image_base64(annotated_frame, quality=75)
 
@@ -247,14 +262,12 @@ def api_person_directory():
         directory_path = data.get("directory_path", "").strip()
 
         if not directory_path:
-            # Default to backend folder
             directory_path = backend_dir
 
         dir_obj = Path(directory_path)
         if not dir_obj.exists() or not dir_obj.is_dir():
             return jsonify({"error": f"Directory not found: {directory_path}"}), 404
 
-        # Search for images
         image_extensions = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.webp"]
         image_files = []
         for ext in image_extensions:
@@ -270,7 +283,7 @@ def api_person_directory():
         total_talking = 0
         total_drowsy = 0
 
-        for idx, img_path in enumerate(image_files[:25]):  # limit batch to 25
+        for idx, img_path in enumerate(image_files[:25]):
             try:
                 frame = cv2.imread(img_path)
                 if frame is None:
@@ -389,25 +402,20 @@ def api_vehicle_directory():
                     
                     crop_b64 = encode_image_base64(crop, quality=85) if crop.size > 0 else None
                     
-                    # AI Vehicle Recognition via OpenRouter / Gemma
                     ai_result_text = None
                     parsed_brand = "Vehicle"
-                    parsed_model = f"Track #{cid}"
+                    parsed_model = ""
                     parsed_type = "Car"
+                    confidence_str = "High"
 
                     if run_ai_recognition and crop_b64:
                         try:
                             ai_result_text = recognize_vehicle(crop_b64)
-                            if ai_result_text:
-                                for line in ai_result_text.splitlines():
-                                    if "Brand:" in line:
-                                        parsed_brand = line.replace("Brand:", "").strip()
-                                    elif "Model:" in line:
-                                        parsed_model = line.replace("Model:", "").strip()
-                                    elif "Type:" in line:
-                                        parsed_type = line.replace("Type:", "").strip()
+                            parsed_brand, parsed_model, parsed_type, confidence_str = parse_ai_vehicle_result(ai_result_text)
                         except Exception as ai_err:
-                            print(f"Vehicle AI recognition error: {ai_err}")
+                            print(f"Vehicle AI recognition error for {img_path}: {ai_err}")
+
+                    brand_model_str = f"{parsed_brand} {parsed_model}".strip() if parsed_brand != "Vehicle" or parsed_model else f"Car #{cid}"
 
                     vehicle_info = {
                         "id": cid,
@@ -417,8 +425,8 @@ def api_vehicle_directory():
                         "type": parsed_type,
                         "make": parsed_brand,
                         "model": parsed_model,
-                        "brand_model": f"{parsed_brand} {parsed_model}".strip(),
-                        "confidence": 0.94,
+                        "brand_model": brand_model_str,
+                        "confidence": 0.96 if confidence_str.lower() == "high" else 0.85,
                         "ai_raw_output": ai_result_text,
                         "crop": f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None
                     }
@@ -517,22 +525,18 @@ def api_vehicle_upload():
             
             ai_text = None
             brand = "Vehicle"
-            vmodel = f"#{cid}"
+            vmodel = ""
             vtype = "Car"
+            confidence_str = "High"
 
             if crop_b64:
                 try:
                     ai_text = recognize_vehicle(crop_b64)
-                    if ai_text:
-                        for line in ai_text.splitlines():
-                            if "Brand:" in line:
-                                brand = line.replace("Brand:", "").strip()
-                            elif "Model:" in line:
-                                vmodel = line.replace("Model:", "").strip()
-                            elif "Type:" in line:
-                                vtype = line.replace("Type:", "").strip()
+                    brand, vmodel, vtype, confidence_str = parse_ai_vehicle_result(ai_text)
                 except Exception as e:
                     print(f"AI recognition error: {e}")
+
+            brand_model_str = f"{brand} {vmodel}".strip() if brand != "Vehicle" or vmodel else f"Car #{cid}"
 
             vehicle_catalog[cid] = {
                 "id": cid,
@@ -540,7 +544,7 @@ def api_vehicle_upload():
                 "type": vtype,
                 "make": brand,
                 "model": vmodel,
-                "brand_model": f"{brand} {vmodel}".strip(),
+                "brand_model": brand_model_str,
                 "crop": f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None,
                 "ai_output": ai_text
             }
