@@ -75,22 +75,20 @@ def _parse_vehicle_ai(text: str) -> dict:
     for raw_line in text.splitlines():
         line = raw_line.replace("*", "").replace("-", "").strip()
         lower = line.lower()
-        def _val(prefix):
-            return line.split(":", 1)[1].strip() if ":" in line else ""
         if "brand:" in lower or "make:" in lower or "company:" in lower:
-            v = _val(line)
+            v = line.split(":", 1)[1].strip() if ":" in line else ""
             if v and v.lower() not in ("unknown", "n/a", "none", "..."):
                 brand = v
         elif "model:" in lower:
-            v = _val(line)
+            v = line.split(":", 1)[1].strip() if ":" in line else ""
             if v and v.lower() not in ("unknown", "n/a", "none", "..."):
                 model = v
         elif "type:" in lower:
-            v = _val(line)
+            v = line.split(":", 1)[1].strip() if ":" in line else ""
             if v and v.lower() not in ("unknown", "n/a", "none", "..."):
                 vtype = v
         elif "confidence:" in lower:
-            v = _val(line)
+            v = line.split(":", 1)[1].strip() if ":" in line else ""
             if v:
                 confidence = v
     return {"brand": brand, "model": model, "type": vtype, "confidence": confidence}
@@ -163,7 +161,7 @@ def _format_person_telemetry(people, faces, postures) -> list:
     return result
 
 
-def _collect_images(directory: str, limit: int = 20) -> list:
+def _collect_images(directory: str, limit: int = 40) -> list:
     exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.webp"]
     files = []
     for ext in exts:
@@ -174,19 +172,12 @@ def _collect_images(directory: str, limit: int = 20) -> list:
 
 # ──────────────── routes ────────────────────
 
-# Per-session state for event deduplication
-_session = {
-    "known_person_ids": set(),   # IDs currently in frame
-    "drowsy_ids": set(),         # IDs flagged as drowsy
-    "talking_ids": set(),        # IDs flagged as talking
-}
-
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "online", "service": "Persentria AI Backend"})
 
 
-# Module 1-A  — live webcam frame from browser
+# Module 1-A — live webcam frame from browser
 @app.route("/api/person/process_frame", methods=["POST"])
 def api_person_frame():
     try:
@@ -205,89 +196,28 @@ def api_person_frame():
         latency_ms = round((time.perf_counter() - t0) * 1000)
 
         people = res.get("people", [])
-        faces  = res.get("faces", [])
+        faces = res.get("faces", [])
         postures = res.get("postures", [])
-        ev_raw = res.get("events", {})
 
         formatted = _format_person_telemetry(people, faces, postures)
 
-        # ── state-change-only events ──────────────────────────
+        # Emit events only for high-priority alerts (drowsiness) to prevent log flooding
         events_out = []
-        current_ids = {p["id"] for p in formatted}
-        known        = _session["known_person_ids"]
-        prev_drowsy  = _session["drowsy_ids"]
-        prev_talking = _session["talking_ids"]
-
-        # entered (new IDs not seen before)
-        for pid in current_ids - known:
-            events_out.append({
-                "id": f"enter-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "PERSON_ENTERED",
-                "message": f"Person #{pid} entered the scene"
-            })
-        # left (IDs no longer in frame)
-        for pid in known - current_ids:
-            events_out.append({
-                "id": f"left-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "PERSON_LEFT",
-                "message": f"Person #{pid} left the scene"
-            })
-
-        # drowsiness — only fire when newly drowsy
-        now_drowsy  = {p["id"] for p in formatted if p["drowsiness"] != "normal"}
-        for pid in now_drowsy - prev_drowsy:
-            events_out.append({
-                "id": f"drowsy-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "PERSON_DROWSY_ALERT",
-                "message": f"⚠️ Drowsiness detected — Person #{pid}"
-            })
-        for pid in prev_drowsy - now_drowsy:
-            events_out.append({
-                "id": f"alert-clear-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "DROWSY_CLEARED",
-                "message": f"✅ Person #{pid} alert cleared"
-            })
-
-        # talking — fire on state change
-        now_talking = {p["id"] for p in formatted if p["talking"]}
-        for pid in now_talking - prev_talking:
-            events_out.append({
-                "id": f"talk-start-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "PERSON_TALKING_START",
-                "message": f"🗣️ Person #{pid} started talking"
-            })
-        for pid in prev_talking - now_talking:
-            events_out.append({
-                "id": f"talk-stop-{pid}-{ts}",
-                "timestamp": time.strftime("%H:%M:%S"),
-                "type": "PERSON_TALKING_STOP",
-                "message": f"🔇 Person #{pid} stopped talking"
-            })
-
-        # update session state
-        _session["known_person_ids"] = current_ids
-        _session["drowsy_ids"]       = now_drowsy
-        _session["talking_ids"]      = now_talking
+        for p in formatted:
+            if p["drowsiness"] != "normal":
+                events_out.append({
+                    "id": f"drowsy-{p['id']}-{int(ts/1000)}",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "type": "PERSON_DROWSY_ALERT",
+                    "message": f"⚠️ Drowsiness alert — Person #{p['id']}"
+                })
 
         stats = {
-            "talkingCount":  sum(1 for p in formatted if p["talking"]),
-            "drowsyCount":   sum(1 for p in formatted if p["drowsiness"] != "normal"),
-            "sittingCount":  sum(1 for p in formatted if p["posture"] == "sitting"),
+            "talkingCount": sum(1 for p in formatted if p["talking"]),
+            "drowsyCount": sum(1 for p in formatted if p["drowsiness"] != "normal"),
+            "sittingCount": sum(1 for p in formatted if p["posture"] == "sitting"),
             "standingCount": sum(1 for p in formatted if p["posture"] == "standing"),
         }
-
-        # annotated preview
-        annotated = _annotate_person_frame(frame, people, faces, postures)
-        # resize for faster transfer
-        h, w = annotated.shape[:2]
-        if w > 800:
-            annotated = cv2.resize(annotated, (800, int(h * 800 / w)))
-        ann_b64 = _encode_b64(annotated, 70)
 
         return jsonify({
             "timestamp": ts,
@@ -297,14 +227,13 @@ def api_person_frame():
             "people": formatted,
             "events": events_out,
             "stats": stats,
-            "annotated_frame": f"data:image/jpeg;base64,{ann_b64}" if ann_b64 else None,
         })
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 1-B  — directory batch scan (persons)
+# Module 1-B — directory batch scan (persons)
 @app.route("/api/person/directory", methods=["POST"])
 def api_person_directory():
     try:
@@ -331,48 +260,107 @@ def api_person_directory():
             try:
                 ts = int(time.time() * 1000)
                 res = process_frame(frame, ts)
-                people   = res.get("people", [])
-                faces    = res.get("faces", [])
+                people = res.get("people", [])
+                faces = res.get("faces", [])
                 postures = res.get("postures", [])
-                fmt      = _format_person_telemetry(people, faces, postures)
+                fmt = _format_person_telemetry(people, faces, postures)
 
-                total_people  += len(fmt)
+                total_people += len(fmt)
                 total_talking += sum(1 for p in fmt if p["talking"])
-                total_drowsy  += sum(1 for p in fmt if p["drowsiness"] != "normal")
+                total_drowsy += sum(1 for p in fmt if p["drowsiness"] != "normal")
 
                 ann = _annotate_person_frame(frame, people, faces, postures)
                 ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
                 thumb = _encode_b64(ann, 60)
 
                 results.append({
-                    "filename":     Path(img_path).name,
+                    "filename": Path(img_path).name,
                     "people_count": len(fmt),
-                    "people":       fmt,
-                    "thumbnail":    f"data:image/jpeg;base64,{thumb}" if thumb else None,
+                    "people": fmt,
+                    "thumbnail": f"data:image/jpeg;base64,{thumb}" if thumb else None,
                 })
             except Exception as ex:
                 print(f"[person-dir] Error on {img_path}: {ex}")
 
         return jsonify({
-            "directory":              directory,
-            "total_images":           len(results),
-            "total_people_detected":  total_people,
-            "total_talking":          total_talking,
-            "total_drowsy":           total_drowsy,
-            "results":                results,
+            "directory": directory,
+            "total_images": len(results),
+            "total_people_detected": total_people,
+            "total_talking": total_talking,
+            "total_drowsy": total_drowsy,
+            "results": results,
         })
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 2  — directory batch scan (vehicles)
+# Module 1-C — batch upload from gallery / browser files (persons)
+@app.route("/api/person/batch_upload", methods=["POST"])
+def api_person_batch_upload():
+    try:
+        uploaded_files = request.files.getlist("files")
+        if not uploaded_files or len(uploaded_files) == 0:
+            if "file" in request.files:
+                uploaded_files = [request.files["file"]]
+            else:
+                return jsonify({"error": "No files uploaded"}), 400
+
+        results = []
+        total_people = total_talking = total_drowsy = 0
+        all_people = []
+
+        for f in uploaded_files:
+            file_bytes = f.read()
+            frame = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+
+            ts = int(time.time() * 1000)
+            res = process_frame(frame, ts)
+            people = res.get("people", [])
+            faces = res.get("faces", [])
+            postures = res.get("postures", [])
+            fmt = _format_person_telemetry(people, faces, postures)
+
+            total_people += len(fmt)
+            total_talking += sum(1 for p in fmt if p["talking"])
+            total_drowsy += sum(1 for p in fmt if p["drowsiness"] != "normal")
+            all_people.extend(fmt)
+
+            ann = _annotate_person_frame(frame, people, faces, postures)
+            if ann.shape[1] > 640:
+                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+            thumb = _encode_b64(ann, 65)
+
+            results.append({
+                "filename": f.filename or "uploaded_image.jpg",
+                "people_count": len(fmt),
+                "people": fmt,
+                "thumbnail": f"data:image/jpeg;base64,{thumb}" if thumb else None,
+            })
+
+        return jsonify({
+            "source": "gallery_upload",
+            "total_images": len(results),
+            "total_people_detected": total_people,
+            "total_talking": total_talking,
+            "total_drowsy": total_drowsy,
+            "people": all_people,
+            "results": results,
+        })
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+# Module 2-A — directory batch scan (vehicles)
 @app.route("/api/vehicle/directory", methods=["POST"])
 def api_vehicle_directory():
     try:
         body = request.json or {}
         directory = body.get("directory_path", "").strip()
-        use_ai    = body.get("ai_recognition", True)
+        use_ai = body.get("ai_recognition", True)
 
         if not directory:
             return jsonify({"error": "directory_path is required"}), 400
@@ -400,137 +388,137 @@ def api_vehicle_directory():
                     cid = car["track_id"]
                     x1, y1, x2, y2 = car["bbox"]
                     h, w = frame.shape[:2]
-                    crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
+                    crop = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
                     crop_b64 = _encode_b64(crop, 85) if crop.size > 0 else None
 
                     ai_info = {"brand": "Unknown", "model": "Unknown", "type": "Car", "confidence": "Low"}
-                    ai_raw  = None
+                    ai_raw = None
                     if use_ai and crop_b64:
                         try:
-                            ai_raw  = recognize_vehicle(crop_b64)
+                            ai_raw = recognize_vehicle(crop_b64)
                             ai_info = _parse_vehicle_ai(ai_raw)
                         except Exception as ai_ex:
                             print(f"[vehicle-ai] {ai_ex}")
 
                     entry = {
-                        "id":         cid,
+                        "id": cid,
                         "image_name": Path(img_path).name,
-                        "bbox":       [x1, y1, x2 - x1, y2 - y1],
-                        "raw_bbox":   [x1, y1, x2, y2],
-                        "brand":      ai_info["brand"],
-                        "model":      ai_info["model"],
-                        "type":       ai_info["type"],
+                        "bbox": [x1, y1, x2 - x1, y2 - y1],
+                        "raw_bbox": [x1, y1, x2, y2],
+                        "brand": ai_info["brand"],
+                        "model": ai_info["model"],
+                        "type": ai_info["type"],
                         "brand_model": f"{ai_info['brand']} {ai_info['model']}".strip(),
                         "confidence": ai_info["confidence"],
-                        "ai_raw":     ai_raw,
-                        "crop":       f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None,
+                        "ai_raw": ai_raw,
+                        "crop": f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None,
                     }
                     catalog[cid] = entry
                     all_vehicles.append(entry)
 
                 ann = _annotate_vehicle_frame(frame, cars, catalog)
-                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+                if ann.shape[1] > 640:
+                    ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
                 thumb = _encode_b64(ann, 60)
 
                 results.append({
-                    "filename":      Path(img_path).name,
+                    "filename": Path(img_path).name,
                     "vehicle_count": len(cars),
-                    "vehicles":      list(catalog.values()),
-                    "thumbnail":     f"data:image/jpeg;base64,{thumb}" if thumb else None,
+                    "vehicles": list(catalog.values()),
+                    "thumbnail": f"data:image/jpeg;base64,{thumb}" if thumb else None,
                 })
             except Exception as ex:
                 print(f"[vehicle-dir] Error on {img_path}: {ex}")
 
         return jsonify({
-            "directory":                directory,
-            "total_images":             len(results),
-            "total_vehicles_detected":  len(all_vehicles),
-            "vehicles":                 all_vehicles,
-            "results":                  results,
+            "directory": directory,
+            "total_images": len(results),
+            "total_vehicles_detected": len(all_vehicles),
+            "vehicles": all_vehicles,
+            "results": results,
         })
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
-# Single-image upload — person
-@app.route("/api/person/upload", methods=["POST"])
-def api_person_upload():
+# Module 2-B — batch upload from gallery / browser files (vehicles)
+@app.route("/api/vehicle/batch_upload", methods=["POST"])
+def api_vehicle_batch_upload():
     try:
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-        data = request.files["file"].read()
-        frame = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
-        if frame is None:
-            return jsonify({"error": "Invalid image"}), 400
+        uploaded_files = request.files.getlist("files")
+        if not uploaded_files or len(uploaded_files) == 0:
+            if "file" in request.files:
+                uploaded_files = [request.files["file"]]
+            else:
+                return jsonify({"error": "No files uploaded"}), 400
 
-        ts = int(time.time() * 1000)
-        res = process_frame(frame, ts)
-        people   = res.get("people", [])
-        faces    = res.get("faces", [])
-        postures = res.get("postures", [])
-        fmt      = _format_person_telemetry(people, faces, postures)
-        ann      = _annotate_person_frame(frame, people, faces, postures)
-        ann_b64  = _encode_b64(ann, 75)
+        use_ai = request.form.get("ai_recognition", "true").lower() == "true"
+
+        results = []
+        all_vehicles = []
+
+        for f in uploaded_files:
+            file_bytes = f.read()
+            frame = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+
+            cars = track_cars(_YOLO_MODEL, frame)
+            catalog = {}
+
+            for car in cars:
+                cid = car["track_id"]
+                x1, y1, x2, y2 = car["bbox"]
+                h, w = frame.shape[:2]
+                crop = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+                crop_b64 = _encode_b64(crop, 85) if crop.size > 0 else None
+
+                ai_info = {"brand": "Unknown", "model": "Unknown", "type": "Car", "confidence": "Low"}
+                ai_raw = None
+                if use_ai and crop_b64:
+                    try:
+                        ai_raw = recognize_vehicle(crop_b64)
+                        ai_info = _parse_vehicle_ai(ai_raw)
+                    except Exception as ai_ex:
+                        print(f"[batch-upload-ai] {ai_ex}")
+
+                entry = {
+                    "id": cid,
+                    "image_name": f.filename or "uploaded_image.jpg",
+                    "bbox": [x1, y1, x2 - x1, y2 - y1],
+                    "raw_bbox": [x1, y1, x2, y2],
+                    "brand": ai_info["brand"],
+                    "model": ai_info["model"],
+                    "type": ai_info["type"],
+                    "brand_model": f"{ai_info['brand']} {ai_info['model']}".strip(),
+                    "confidence": ai_info["confidence"],
+                    "ai_raw": ai_raw,
+                    "crop": f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None,
+                }
+                catalog[cid] = entry
+                all_vehicles.append(entry)
+
+            ann = _annotate_vehicle_frame(frame, cars, catalog)
+            if ann.shape[1] > 640:
+                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+            thumb = _encode_b64(ann, 65)
+
+            results.append({
+                "filename": f.filename or "uploaded_image.jpg",
+                "vehicle_count": len(cars),
+                "vehicles": list(catalog.values()),
+                "thumbnail": f"data:image/jpeg;base64,{thumb}" if thumb else None,
+            })
 
         return jsonify({
-            "people_count":    len(fmt),
-            "people":          fmt,
-            "annotated_image": f"data:image/jpeg;base64,{ann_b64}" if ann_b64 else None,
+            "source": "gallery_upload",
+            "total_images": len(results),
+            "total_vehicles_detected": len(all_vehicles),
+            "vehicles": all_vehicles,
+            "results": results,
         })
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
 
-
-# Single-image upload — vehicle
-@app.route("/api/vehicle/upload", methods=["POST"])
-def api_vehicle_upload():
-    try:
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-        data  = request.files["file"].read()
-        frame = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
-        if frame is None:
-            return jsonify({"error": "Invalid image"}), 400
-
-        cars    = track_cars(_YOLO_MODEL, frame)
-        catalog = {}
-
-        for car in cars:
-            cid = car["track_id"]
-            x1, y1, x2, y2 = car["bbox"]
-            h, w = frame.shape[:2]
-            crop     = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
-            crop_b64 = _encode_b64(crop, 85) if crop.size > 0 else None
-
-            ai_info = {"brand": "Unknown", "model": "Unknown", "type": "Car", "confidence": "Low"}
-            ai_raw  = None
-            if crop_b64:
-                try:
-                    ai_raw  = recognize_vehicle(crop_b64)
-                    ai_info = _parse_vehicle_ai(ai_raw)
-                except Exception as ai_ex:
-                    print(f"[upload-ai] {ai_ex}")
-
-            catalog[cid] = {
-                "id":          cid,
-                "brand":       ai_info["brand"],
-                "model":       ai_info["model"],
-                "brand_model": f"{ai_info['brand']} {ai_info['model']}".strip(),
-                "type":        ai_info["type"],
-                "confidence":  ai_info["confidence"],
-                "crop":        f"data:image/jpeg;base64,{crop_b64}" if crop_b64 else None,
-                "ai_raw":      ai_raw,
-            }
-
-        ann     = _annotate_vehicle_frame(frame, cars, catalog)
-        ann_b64 = _encode_b64(ann, 75)
-
-        return jsonify({
-            "vehicle_count":   len(cars),
-            "vehicles":        list(catalog.values()),
-            "annotated_image": f"data:image/jpeg;base64,{ann_b64}" if ann_b64 else None,
-        })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
