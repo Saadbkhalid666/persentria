@@ -11,6 +11,7 @@ from analysis.sitting_standing import (
 
 
 model = load_model()
+car_model = load_car_model()
 landmarker = create_face_landmarker()
 pose_landmarker = create_pose_landmarker()
 
