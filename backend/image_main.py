@@ -1,7 +1,33 @@
 import cv2
-
+import base64
 from inputs.image import load_image
 from processing.process_frame import process_frame
+from analysis.vehicle_recognition import recognize_vehicle
+
+
+def encode_car_crop(frame, bbox):
+    x1, y1, x2, y2 = bbox
+
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(frame.shape[1], x2)
+    y2 = min(frame.shape[0], y2)
+
+    crop = frame[y1:y2, x1:x2]
+
+    if crop.size == 0:
+        return None
+
+    success, buffer = cv2.imencode(".jpg", crop)
+
+    if not success:
+        return None
+
+    return base64.b64encode(
+        buffer
+    ).decode("utf-8")
+
+
 
 
 def draw_people(frame, people):
@@ -80,7 +106,6 @@ def main():
 
     frame = load_image(image_path)
 
-    # Single image = single timestamp
     timestamp_ms = 0
 
     results = process_frame(
