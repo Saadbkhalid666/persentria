@@ -174,6 +174,13 @@ def _collect_images(directory: str, limit: int = 20) -> list:
 
 # ──────────────── routes ────────────────────
 
+# Per-session state for event deduplication
+_session = {
+    "known_person_ids": set(),   # IDs currently in frame
+    "drowsy_ids": set(),         # IDs flagged as drowsy
+    "talking_ids": set(),        # IDs flagged as talking
+}
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "online", "service": "Persentria AI Backend"})
@@ -204,32 +211,68 @@ def api_person_frame():
 
         formatted = _format_person_telemetry(people, faces, postures)
 
-        # entry / exit events
+        # ── state-change-only events ──────────────────────────
         events_out = []
-        for eid in ev_raw.get("entered", []):
+        current_ids = {p["id"] for p in formatted}
+        known        = _session["known_person_ids"]
+        prev_drowsy  = _session["drowsy_ids"]
+        prev_talking = _session["talking_ids"]
+
+        # entered (new IDs not seen before)
+        for pid in current_ids - known:
             events_out.append({
-                "id": f"enter-{eid}-{ts}",
+                "id": f"enter-{pid}-{ts}",
                 "timestamp": time.strftime("%H:%M:%S"),
                 "type": "PERSON_ENTERED",
-                "message": f"Person #{eid} entered the scene"
+                "message": f"Person #{pid} entered the scene"
             })
-        for lid in ev_raw.get("left", []):
+        # left (IDs no longer in frame)
+        for pid in known - current_ids:
             events_out.append({
-                "id": f"left-{lid}-{ts}",
+                "id": f"left-{pid}-{ts}",
                 "timestamp": time.strftime("%H:%M:%S"),
                 "type": "PERSON_LEFT",
-                "message": f"Person #{lid} left the scene"
+                "message": f"Person #{pid} left the scene"
             })
 
-        # drowsiness alerts
-        for p in formatted:
-            if p["drowsiness"] != "normal":
-                events_out.append({
-                    "id": f"drowsy-{p['id']}-{ts}",
-                    "timestamp": time.strftime("%H:%M:%S"),
-                    "type": "PERSON_DROWSY_ALERT",
-                    "message": f"⚠️ Drowsiness detected — Person #{p['id']}"
-                })
+        # drowsiness — only fire when newly drowsy
+        now_drowsy  = {p["id"] for p in formatted if p["drowsiness"] != "normal"}
+        for pid in now_drowsy - prev_drowsy:
+            events_out.append({
+                "id": f"drowsy-{pid}-{ts}",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "type": "PERSON_DROWSY_ALERT",
+                "message": f"⚠️ Drowsiness detected — Person #{pid}"
+            })
+        for pid in prev_drowsy - now_drowsy:
+            events_out.append({
+                "id": f"alert-clear-{pid}-{ts}",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "type": "DROWSY_CLEARED",
+                "message": f"✅ Person #{pid} alert cleared"
+            })
+
+        # talking — fire on state change
+        now_talking = {p["id"] for p in formatted if p["talking"]}
+        for pid in now_talking - prev_talking:
+            events_out.append({
+                "id": f"talk-start-{pid}-{ts}",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "type": "PERSON_TALKING_START",
+                "message": f"🗣️ Person #{pid} started talking"
+            })
+        for pid in prev_talking - now_talking:
+            events_out.append({
+                "id": f"talk-stop-{pid}-{ts}",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "type": "PERSON_TALKING_STOP",
+                "message": f"🔇 Person #{pid} stopped talking"
+            })
+
+        # update session state
+        _session["known_person_ids"] = current_ids
+        _session["drowsy_ids"]       = now_drowsy
+        _session["talking_ids"]      = now_talking
 
         stats = {
             "talkingCount":  sum(1 for p in formatted if p["talking"]),
