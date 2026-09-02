@@ -1,7 +1,7 @@
 import cv2
 import base64
 
-from inputs.image import load_image
+from inputs.image_input import load_image
 from processing.process_frame import process_frame
 from analysis.vehicle_recognition import recognize_vehicle
 
