@@ -12,11 +12,7 @@ from processing.process_frame import process_frame
 from analysis.vehicle_recognition import recognize_vehicle
 
 
-# Stores vehicle recognition results
-# Example:
-# {
-#     1: "Brand: Toyota\nModel: Corolla..."
-# }
+ 
 vehicle_cache = {}
 
 
@@ -86,15 +82,12 @@ def draw_cars(frame, cars, vehicle_cache):
             2
         )
 
-        # Default label
         label = f"Car #{car_id}"
 
-        # Add recognized vehicle information
         if car_id in vehicle_cache:
 
             vehicle_result = vehicle_cache[car_id]
 
-            # Keep the API response on one line
             vehicle_result = vehicle_result.replace(
                 "\n",
                 " | "
@@ -164,9 +157,6 @@ def main():
                 timestamp_ms
             )
 
-            # --------------------------------
-            # PEOPLE
-            # --------------------------------
 
             people = results["people"]
 
@@ -175,18 +165,12 @@ def main():
                 people
             )
 
-            # --------------------------------
-            # CARS
-            # --------------------------------
 
             cars = results["cars"]
 
-            # Recognize only NEW cars
             for car in cars:
 
                 car_id = car["track_id"]
-
-                # Already recognized
                 if car_id in vehicle_cache:
                     continue
 
@@ -230,9 +214,6 @@ def main():
                 vehicle_cache
             )
 
-            # --------------------------------
-            # FACES
-            # --------------------------------
 
             draw_face_mesh(
                 frame,
@@ -253,9 +234,6 @@ def main():
                     f"{person['talking']['mouth_ratio']:.3f}"
                 )
 
-            # --------------------------------
-            # POSTURE
-            # --------------------------------
 
             for posture in results["postures"]:
 
@@ -263,9 +241,6 @@ def main():
                     f"Posture: {posture['state']}"
                 )
 
-            # --------------------------------
-            # COUNTERS
-            # --------------------------------
 
             cv2.putText(
                 frame,
@@ -286,10 +261,6 @@ def main():
                 (255, 0, 0),
                 2
             )
-
-            # --------------------------------
-            # DISPLAY
-            # --------------------------------
 
             cv2.imshow(
                 "Persentria",
