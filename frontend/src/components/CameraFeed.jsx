@@ -1,23 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Video, Eye, Shield, Activity, Maximize2, RefreshCw, Layers, Cpu, Sparkles, AlertCircle } from 'lucide-react';
+import { Camera, Video, Layers, Sparkles, Cpu, AlertCircle, RefreshCw, Eye, Flame, ShieldAlert } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
+import { processPersonFrame } from '../lib/api';
 
-export default function CameraFeed({ data, mode, isWebsocketConnected }) {
-  const [streamSource, setStreamSource] = useState('simulated'); // 'simulated' | 'webcam'
+export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpdate }) {
+  const [streamSource, setStreamSource] = useState('webcam'); // 'webcam' | 'simulated'
   const [webcamActive, setWebcamActive] = useState(false);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [webcamError, setWebcamError] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [fps, setFps] = useState(30);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const captureCanvasRef = useRef(null);
+  const loopRef = useRef(null);
 
-  // Handle Real Webcam Stream
+  // Initialize browser webcam stream
   useEffect(() => {
     let mediaStream = null;
 
     if (streamSource === 'webcam') {
-      navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+      navigator.mediaDevices
+        ?.getUserMedia({ video: { width: 1280, height: 720 } })
         .then((stream) => {
           mediaStream = stream;
           if (videoRef.current) {
@@ -28,15 +34,15 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
           setWebcamError(null);
         })
         .catch((err) => {
-          console.error('Error accessing camera:', err);
-          setWebcamError('Camera access denied or unavailable. Fallback to Simulated AI Stream.');
+          console.warn('Webcam not accessible:', err);
+          setWebcamError('Webcam unavailable or permission denied. Running in Simulated Scene mode.');
           setStreamSource('simulated');
           setWebcamActive(false);
         });
     } else {
       if (videoRef.current && videoRef.current.srcObject) {
         const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
+        tracks.forEach((track) => track.stop());
         videoRef.current.srcObject = null;
       }
       setWebcamActive(false);
@@ -44,12 +50,63 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
     return () => {
       if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [streamSource]);
 
-  // Render Overlays & AI Bounding Boxes on Canvas
+  // Live Backend Frame Processing Loop
+  useEffect(() => {
+    if (!webcamActive || !isBackendOnline || streamSource !== 'webcam') {
+      return;
+    }
+
+    let lastTime = performance.now();
+    let isRequestInProgress = false;
+
+    const processLoop = async () => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || isRequestInProgress) return;
+
+      try {
+        isRequestInProgress = true;
+        let captureCanvas = captureCanvasRef.current;
+        if (!captureCanvas) {
+          captureCanvas = document.createElement('canvas');
+          captureCanvas.width = 640;
+          captureCanvas.height = 360;
+          captureCanvasRef.current = captureCanvas;
+        }
+
+        const ctx = captureCanvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        const imageB64 = captureCanvas.toDataURL('image/jpeg', 0.65);
+
+        const startTime = performance.now();
+        const res = await processPersonFrame(imageB64);
+        const elapsed = performance.now() - startTime;
+
+        if (onTelemetryUpdate && res) {
+          onTelemetryUpdate({
+            ...res,
+            latencyMs: Math.round(elapsed),
+            fps: Math.round(1000 / Math.max(elapsed, 30))
+          });
+        }
+
+        setFps(Math.round(1000 / Math.max(elapsed, 30)));
+      } catch (err) {
+        console.warn('Live frame process error:', err);
+      } finally {
+        isRequestInProgress = false;
+      }
+    };
+
+    const interval = setInterval(processLoop, 200); // 5 FPS network inference rate
+    return () => clearInterval(interval);
+  }, [webcamActive, isBackendOnline, streamSource, onTelemetryUpdate]);
+
+  // Render Canvas Overlays
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -58,26 +115,24 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Simulated Background Video Graphic if webcam is off
+    // If webcam is off, render futuristic dark grid
     if (!webcamActive) {
-      // Light Mode Room Gradient
       const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      grad.addColorStop(0, '#f1f5f9');
-      grad.addColorStop(0.5, '#e2e8f0');
-      grad.addColorStop(1, '#cbd5e1');
+      grad.addColorStop(0, '#090d16');
+      grad.addColorStop(0.5, '#0d1527');
+      grad.addColorStop(1, '#050811');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw light perspective room grid lines
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.12)';
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)';
       ctx.lineWidth = 1;
-      for (let i = 0; i < canvas.width; i += 60) {
+      for (let i = 0; i < canvas.width; i += 40) {
         ctx.beginPath();
         ctx.moveTo(i, 0);
         ctx.lineTo(i, canvas.height);
         ctx.stroke();
       }
-      for (let j = 0; j < canvas.height; j += 60) {
+      for (let j = 0; j < canvas.height; j += 40) {
         ctx.beginPath();
         ctx.moveTo(0, j);
         ctx.lineTo(canvas.width, j);
@@ -87,21 +142,30 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
 
     if (!showBoxes || !data) return;
 
-    // Render Bounding Boxes & AI Annotations for Room Mode
+    // Render People Bounding Boxes & Reticles
     if (mode === PROJECT_MODES.ROOM && data.people) {
       data.people.forEach((person) => {
-        const [x, y, w, h] = person.bbox;
-        const isDrowsy = person.drowsiness !== 'normal';
+        let [x, y, w, h] = person.bbox;
+        // Scale coordinates to canvas resolution (800x450)
+        const scaleX = canvas.width / (person.raw_bbox ? 640 : 800);
+        const scaleY = canvas.height / (person.raw_bbox ? 360 : 450);
+
+        if (person.raw_bbox) {
+          x = person.raw_bbox[0] * (canvas.width / 640);
+          y = person.raw_bbox[1] * (canvas.height / 360);
+          w = (person.raw_bbox[2] - person.raw_bbox[0]) * (canvas.width / 640);
+          h = (person.raw_bbox[3] - person.raw_bbox[1]) * (canvas.height / 360);
+        }
+
+        const isDrowsy = person.drowsiness !== 'normal' || person.eyes === 'closed';
         const isTalking = person.talking;
-        const isSmiling = person.smiling;
+        const mainColor = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : '#10b981';
 
-        const mainColor = isDrowsy ? '#ef4444' : isTalking ? '#3b82f6' : isSmiling ? '#10b981' : '#8b5cf6';
-
-        // 1. Draw Corner Reticle Bounding Box
+        // 1. High-Tech Corner Reticles
         ctx.strokeStyle = mainColor;
         ctx.lineWidth = 2.5;
+        const cornerLen = 14;
 
-        const cornerLen = 16;
         // Top-Left
         ctx.beginPath();
         ctx.moveTo(x, y + cornerLen);
@@ -130,39 +194,43 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
         ctx.lineTo(x + w, y + h - cornerLen);
         ctx.stroke();
 
-        // Semi-transparent box fill
-        ctx.fillStyle = `${mainColor}12`;
+        // Subtle box tint
+        ctx.fillStyle = `${mainColor}15`;
         ctx.fillRect(x, y, w, h);
 
-        // 2. Draw ID & Status Tag Banner
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.strokeStyle = '#cbd5e1';
+        // 2. ID & Confidence Tag Banner
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.strokeStyle = mainColor;
         ctx.lineWidth = 1;
-        const tagHeight = 26;
-        ctx.fillRect(x, y - tagHeight - 4, 180, tagHeight);
-        ctx.strokeRect(x, y - tagHeight - 4, 180, tagHeight);
+        ctx.fillRect(x, y - 24, 150, 22);
+        ctx.strokeRect(x, y - 24, 150, 22);
 
         ctx.fillStyle = mainColor;
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText(`ID #${person.id} | ${person.confidence ? (person.confidence * 100).toFixed(0) : 95}%`, x + 8, y - 12);
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(`ID #${person.id} | ${person.posture || 'Detected'}`, x + 6, y - 9);
 
-        // Behavior badges below box
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.fillRect(x, y + h + 4, 160, 22);
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.strokeRect(x, y + h + 4, 160, 22);
-        
-        ctx.fillStyle = isDrowsy ? '#ef4444' : isTalking ? '#3b82f6' : '#334155';
-        ctx.font = 'bold 11px sans-serif';
-        const labelText = isDrowsy ? '⚠️ Drowsiness' : isTalking ? '🗣️ Talking' : isSmiling ? '😊 Smiling' : '👤 Stationary';
-        ctx.fillText(labelText, x + 8, y + h + 18);
+        // 3. Status Tag below bounding box
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(x, y + h + 2, 160, 20);
+        ctx.strokeRect(x, y + h + 2, 160, 20);
 
-        // 3. Draw Face Landmark Points if enabled
+        ctx.fillStyle = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : '#94a3b8';
+        ctx.font = 'bold 10px sans-serif';
+        const labelText = isDrowsy
+          ? '⚠️ Drowsiness Alert'
+          : isTalking
+          ? '🗣️ Talking Active'
+          : `👁️ Eyes: ${person.eyes || 'Open'}`;
+        ctx.fillText(labelText, x + 6, y + h + 15);
+
+        // 4. Face Mesh Landmark Dots
         if (showLandmarks && person.faceLandmarks) {
-          ctx.fillStyle = '#3b82f6';
+          ctx.fillStyle = '#06b6d4';
           person.faceLandmarks.forEach((pt) => {
+            const px = pt.x * (pt.x <= 1 ? canvas.width : 1);
+            const py = pt.y * (pt.y <= 1 ? canvas.height : 1);
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 2, 0, 2 * Math.PI);
+            ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
             ctx.fill();
           });
         }
@@ -173,67 +241,73 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
     if (mode === PROJECT_MODES.TRAFFIC && data.vehicles) {
       data.vehicles.forEach((vehicle) => {
         const [x, y, w, h] = vehicle.bbox;
-        const isSpeeding = vehicle.speedKmh > 70;
-        const mainColor = isSpeeding ? '#f59e0b' : '#3b82f6';
-
-        ctx.strokeStyle = mainColor;
+        ctx.strokeStyle = '#06b6d4';
         ctx.lineWidth = 2.5;
         ctx.strokeRect(x, y, w, h);
-
-        ctx.fillStyle = `${mainColor}12`;
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.1)';
         ctx.fillRect(x, y, w, h);
 
-        // Tag
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.fillRect(x, y - 28, 200, 24);
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.strokeRect(x, y - 28, 200, 24);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(x, y - 24, 170, 22);
+        ctx.strokeStyle = '#06b6d4';
+        ctx.strokeRect(x, y - 24, 170, 22);
 
-        ctx.fillStyle = mainColor;
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText(`${vehicle.type} #${vehicle.id} | ${vehicle.speedKmh} km/h`, x + 8, y - 12);
+        ctx.fillStyle = '#06b6d4';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(`${vehicle.type || 'Car'} #${vehicle.id}`, x + 6, y - 9);
       });
     }
-
   }, [data, showBoxes, showLandmarks, mode, webcamActive]);
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between h-full">
-      {/* Header bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3 z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-          <span className="font-semibold text-slate-800 tracking-wider text-sm flex items-center gap-2">
-            <Camera className="w-4 h-4 text-blue-500" />
-            AI CAMERA FEED OVERLAY
+    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex flex-col justify-between h-full">
+      {/* HUD Header Bar */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="font-bold text-white tracking-wider text-xs font-mono flex items-center gap-1.5">
+            <Camera className="w-4 h-4 text-cyan-400" />
+            LIVE AI VISION FEED
           </span>
-          <span className="text-xs px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 font-medium">
-            {mode} Mode
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-mono">
+            {mode === PROJECT_MODES.ROOM ? 'Person & Face Engine' : 'Traffic Engine'}
           </span>
         </div>
 
-        {/* Controls toolbar */}
+        {/* Toolbar controls */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setStreamSource(streamSource === 'simulated' ? 'webcam' : 'simulated')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${streamSource === 'webcam' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition border ${
+              streamSource === 'webcam'
+                ? 'bg-cyan-600 text-white border-cyan-500 shadow-lg shadow-cyan-500/20'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+            }`}
           >
             <Video className="w-3.5 h-3.5" />
-            {streamSource === 'webcam' ? 'Live Webcam' : 'Use Webcam'}
+            {streamSource === 'webcam' ? 'Live Webcam Active' : 'Enable Webcam'}
           </button>
 
           <button
             onClick={() => setShowBoxes(!showBoxes)}
-            className={`p-1.5 rounded-lg text-xs transition ${showBoxes ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-            title="Toggle Bounding Boxes"
+            className={`p-1.5 rounded-xl text-xs transition border ${
+              showBoxes
+                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
+                : 'bg-slate-800 text-slate-500 border-slate-700'
+            }`}
+            title="Toggle Bounding Reticles"
           >
             <Layers className="w-4 h-4" />
           </button>
 
           <button
             onClick={() => setShowLandmarks(!showLandmarks)}
-            className={`p-1.5 rounded-lg text-xs transition ${showLandmarks ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-            title="Toggle Facial Landmarks"
+            className={`p-1.5 rounded-xl text-xs transition border ${
+              showLandmarks
+                ? 'bg-violet-500/20 text-violet-400 border-violet-500/40'
+                : 'bg-slate-800 text-slate-500 border-slate-700'
+            }`}
+            title="Toggle Facial Mesh"
           >
             <Sparkles className="w-4 h-4" />
           </button>
@@ -241,15 +315,15 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
       </div>
 
       {webcamError && (
-        <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs flex items-center gap-2">
+        <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {webcamError}
         </div>
       )}
 
       {/* Main View Area */}
-      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
-        {/* Hidden video element for real webcam */}
+      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner flex items-center justify-center">
+        {/* Hidden video element for live webcam */}
         <video
           ref={videoRef}
           className={`absolute inset-0 w-full h-full object-cover ${webcamActive ? 'block' : 'hidden'}`}
@@ -265,27 +339,27 @@ export default function CameraFeed({ data, mode, isWebsocketConnected }) {
           className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
         />
 
-        {/* HUD Scanner Frame lines */}
-        <div className="absolute inset-0 pointer-events-none border border-slate-300/40 z-20">
-          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-slate-400" />
-          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-slate-400" />
-          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-slate-400" />
-          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-slate-400" />
+        {/* HUD Scanner Corner Lines */}
+        <div className="absolute inset-0 pointer-events-none border border-cyan-500/10 z-20">
+          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-400" />
+          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-400" />
+          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-cyan-400" />
+          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-400" />
         </div>
 
         {/* Top Info HUD Bar */}
-        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200/80 z-30 flex items-center gap-3 text-xs text-slate-600 shadow-sm">
-          <div className="flex items-center gap-1.5 text-blue-600 font-bold">
+        <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 z-30 flex items-center gap-3 text-xs text-slate-400 shadow-lg">
+          <div className="flex items-center gap-1.5 text-cyan-400 font-bold font-mono">
             <Cpu className="w-3.5 h-3.5" />
-            YOLOv8 + MediaPipe
+            YOLOv11 + MediaPipe
           </div>
-          <div className="w-px h-3 bg-slate-200" />
+          <div className="w-px h-3 bg-slate-800" />
           <div>
-            FPS: <span className="text-emerald-600 font-bold">{data?.fps || 30}</span>
+            FPS: <span className="text-emerald-400 font-bold font-mono">{data?.fps || fps}</span>
           </div>
-          <div className="w-px h-3 bg-slate-200" />
+          <div className="w-px h-3 bg-slate-800" />
           <div>
-            Latency: <span className="text-blue-600 font-bold">{data?.latencyMs || 14}ms</span>
+            Latency: <span className="text-cyan-400 font-bold font-mono">{data?.latencyMs || 15}ms</span>
           </div>
         </div>
       </div>

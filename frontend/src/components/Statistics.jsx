@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MessageSquare, Smile, Activity, AlertTriangle, Cpu, Gauge } from 'lucide-react';
+import { Users, MessageSquare, AlertTriangle, Cpu, Gauge, Activity } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
 
 export default function Statistics({ data, mode }) {
@@ -10,15 +10,15 @@ export default function Statistics({ data, mode }) {
     ? [
         {
           title: 'Total Vehicles',
-          value: data?.vehicles_count || 0,
-          sub: 'Live ByteTrack Feed',
+          value: data?.vehicles_count || data?.vehicles?.length || 0,
+          sub: 'Live Detection Count',
           icon: Gauge,
           color: 'cyan'
         },
         {
           title: 'Average Speed',
-          value: `${stats.avgSpeed || 50} km/h`,
-          sub: 'Calibrated Highway Model',
+          value: stats.avgSpeed ? `${stats.avgSpeed} km/h` : '0 km/h',
+          sub: 'Spatial Vector Model',
           icon: Activity,
           color: 'emerald'
         },
@@ -31,57 +31,81 @@ export default function Statistics({ data, mode }) {
         },
         {
           title: 'AI Processing FPS',
-          value: `${data?.fps || 30} FPS`,
-          sub: `${data?.latencyMs || 14}ms Neural Latency`,
+          value: data ? `${data.fps || 0} FPS` : '0 FPS',
+          sub: data ? `${data.latencyMs || 0}ms Latency` : 'Waiting for input',
           icon: Cpu,
-          color: 'purple'
+          color: 'violet'
         }
       ]
     : [
         {
-          title: 'People Count',
-          value: data?.people_count || 0,
-          sub: 'YOLOv8 Detection',
+          title: 'People Detected',
+          value: data?.people_count || data?.people?.length || 0,
+          sub: 'YOLOv11 Person Class',
           icon: Users,
           color: 'cyan'
         },
         {
-          title: 'Active Talking',
+          title: 'Talking Active',
           value: stats.talkingCount || 0,
-          sub: 'Temporal Mouth Analysis',
+          sub: 'Mouth Aspect Ratio (MAR)',
           icon: MessageSquare,
-          color: 'purple'
-        },
-        {
-          title: 'Smiling Detected',
-          value: stats.smilingCount || 0,
-          sub: 'Facial Geometry Model',
-          icon: Smile,
-          color: 'emerald'
+          color: 'violet'
         },
         {
           title: 'Drowsiness Risk',
           value: stats.drowsyCount || 0,
-          sub: 'Eye Closure Model',
+          sub: 'Eye Aspect Ratio (EAR)',
           icon: AlertTriangle,
           color: stats.drowsyCount > 0 ? 'red' : 'amber'
+        },
+        {
+          title: 'Sitting / Standing',
+          value: `${stats.sittingCount || 0} / ${stats.standingCount || 0}`,
+          sub: 'MediaPipe Knee Angle Model',
+          icon: Activity,
+          color: 'emerald'
         }
       ];
 
   const getColorClasses = (color) => {
     switch (color) {
       case 'cyan':
-        return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' };
-      case 'purple':
-        return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' };
+        return {
+          bg: 'bg-cyan-500/10',
+          text: 'text-cyan-400',
+          border: 'border-cyan-500/20'
+        };
+      case 'violet':
+        return {
+          bg: 'bg-violet-500/10',
+          text: 'text-violet-400',
+          border: 'border-violet-500/20'
+        };
       case 'emerald':
-        return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' };
+        return {
+          bg: 'bg-emerald-500/10',
+          text: 'text-emerald-400',
+          border: 'border-emerald-500/20'
+        };
       case 'red':
-        return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
+        return {
+          bg: 'bg-red-500/10',
+          text: 'text-red-400',
+          border: 'border-red-500/20'
+        };
       case 'amber':
-        return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100' };
+        return {
+          bg: 'bg-amber-500/10',
+          text: 'text-amber-400',
+          border: 'border-amber-500/20'
+        };
       default:
-        return { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-100' };
+        return {
+          bg: 'bg-slate-800/40',
+          text: 'text-slate-300',
+          border: 'border-slate-800'
+        };
     }
   };
 
@@ -94,16 +118,16 @@ export default function Statistics({ data, mode }) {
         return (
           <div
             key={idx}
-            className={`bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between transition-all hover:shadow-md`}
+            className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-xl rounded-2xl p-4 shadow-xl flex items-center justify-between transition-all hover:border-slate-700"
           >
             <div>
-              <p className="text-xs text-slate-500 font-medium">{card.title}</p>
-              <h3 className={`text-2xl font-bold font-mono my-0.5 ${colorStyle.text}`}>
+              <p className="text-xs text-slate-400 font-medium">{card.title}</p>
+              <h3 className={`text-2xl font-black font-mono my-0.5 tracking-tight ${colorStyle.text}`}>
                 {card.value}
               </h3>
-              <p className="text-[10px] text-slate-400">{card.sub}</p>
+              <p className="text-[10px] text-slate-500 font-mono">{card.sub}</p>
             </div>
-            <div className={`p-2.5 rounded-xl ${colorStyle.bg} ${colorStyle.text} border ${colorStyle.border}`}>
+            <div className={`p-3 rounded-2xl ${colorStyle.bg} ${colorStyle.text} border ${colorStyle.border}`}>
               <IconComponent className="w-5 h-5" />
             </div>
           </div>

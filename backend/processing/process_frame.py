@@ -1,5 +1,6 @@
 from detection.person_detector import load_model
 from tracking.object_tracker import track_people, detect_entry_exit, track_cars
+from detection.car_detector import load_car_model
 from detection.face_analyzer import create_face_landmarker, analyze_faces
 from analysis.face_person_matcher import match_faces_to_people
 from analysis.eye_state import get_eye_state

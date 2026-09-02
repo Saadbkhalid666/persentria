@@ -1,6 +1,5 @@
 import cv2
 import time
-
 from inputs.camera import (
     open_camera,
     read_frame,
@@ -9,8 +8,16 @@ from inputs.camera import (
 
 from processing.process_frame import process_frame
 
+
+ 
+
+
+
+
 def draw_people(frame, people):
+
     for person in people:
+
         x1, y1, x2, y2 = person["bbox"]
         person_id = person["track_id"]
 
@@ -34,51 +41,8 @@ def draw_people(frame, people):
             2
         )
 
-def draw_cars(frame, cars):
 
-    for car in cars:
 
-        x1, y1, x2, y2 = car["bbox"]
-        car_id = car["track_id"]
-
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            (255, 0, 0),
-            2
-        )
-
-        cv2.putText(
-            frame,
-            f"Car #{car_id}",
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 0, 0),
-            2
-        )
-
-def draw_face_landmarks(frame, face_results):
-    h, w = frame.shape[:2]
-
-    for face in face_results:
-        landmarks = face.get("landmarks")
-
-        if not landmarks:
-            continue
-
-        for landmark in landmarks:
-            x = int(landmark.x * w)
-            y = int(landmark.y * h)
-
-            cv2.circle(
-                frame,
-                (x, y),
-                1,
-                (0, 255, 0),
-                -1
-            )
 
 def draw_face_mesh(frame, faces):
 
@@ -86,7 +50,10 @@ def draw_face_mesh(frame, faces):
 
     for face in faces:
 
-        landmarks = face["landmarks"]
+        landmarks = face.get("landmarks")
+
+        if not landmarks:
+            continue
 
         for landmark in landmarks:
 
@@ -101,7 +68,9 @@ def draw_face_mesh(frame, faces):
                 -1
             )
 
+
 def main():
+
     camera = open_camera(
         camera_index=0,
         width=1280,
@@ -112,7 +81,9 @@ def main():
     start_time = time.monotonic()
 
     try:
+
         while True:
+
             frame = read_frame(camera)
 
             timestamp_ms = int(
@@ -124,25 +95,52 @@ def main():
                 timestamp_ms
             )
 
+
             people = results["people"]
-            draw_people(frame, people)
+
+            draw_people(
+                frame,
+                people
+            )
+
 
             cars = results["cars"]
-            draw_cars(frame, cars)
+
+            
+
+            draw_cars(
+                frame,
+                cars,
+                vehicle_cache
+            )
+
+
+            draw_face_mesh(
+                frame,
+                results["faces"]
+            )
 
             for person in results["faces"]:
+
                 print(
                     f"Person #{person['person_id']} | "
-                    f"Eyes: {person['eye_state']['state']} | "
-                    f"Blinks: {person['eye_state']['blink_count']} | "
-                    f"Talking: {person['talking']['talking']} | "
-                    f"Mouth: {person['talking']['mouth_ratio']:.3f}"
+                    f"Eyes: "
+                    f"{person['eye_state']['state']} | "
+                    f"Blinks: "
+                    f"{person['eye_state']['blink_count']} | "
+                    f"Talking: "
+                    f"{person['talking']['talking']} | "
+                    f"Mouth: "
+                    f"{person['talking']['mouth_ratio']:.3f}"
                 )
 
+
             for posture in results["postures"]:
+
                 print(
                     f"Posture: {posture['state']}"
-                )   
+                )
+
 
             cv2.putText(
                 frame,
@@ -153,6 +151,7 @@ def main():
                 (0, 255, 0),
                 2
             )
+
             cv2.putText(
                 frame,
                 f"Cars: {len(cars)}",
@@ -163,13 +162,18 @@ def main():
                 2
             )
 
-            cv2.imshow("Persentria", frame)
+            cv2.imshow(
+                "Persentria",
+                frame
+            )
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
     finally:
+
         release_camera(camera)
+
         cv2.destroyAllWindows()
 
 

@@ -10,7 +10,7 @@ export default function ThreeBackground() {
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0xf8fafc, 0.015);
+    scene.fog = new THREE.FogExp2(0x070913, 0.02);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(
@@ -28,15 +28,15 @@ export default function ThreeBackground() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Light Theme Grid Plane
-    const gridHelper = new THREE.GridHelper(120, 40, 0x3b82f6, 0xe2e8f0);
+    // Dark Theme Grid Plane
+    const gridHelper = new THREE.GridHelper(120, 40, 0x06b6d4, 0x1e293b);
     gridHelper.position.y = -5;
-    gridHelper.material.opacity = 0.15;
+    gridHelper.material.opacity = 0.2;
     gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
-    // Soft Blue Particles
-    const particlesCount = 300;
+    // Cyan/Violet Particles
+    const particlesCount = 350;
     const posArray = new Float32Array(particlesCount * 3);
     const scaleArray = new Float32Array(particlesCount);
 
@@ -51,22 +51,22 @@ export default function ThreeBackground() {
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
 
     const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.3,
-      color: 0x3b82f6,
+      size: 0.35,
+      color: 0x06b6d4,
       transparent: true,
-      opacity: 0.35
+      opacity: 0.45
     });
 
     const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
     scene.add(particleMesh);
 
-    // 3D Floating Node
+    // 3D Floating Nodes
     const nodeGeometry = new THREE.IcosahedronGeometry(3, 1);
     const nodeMaterial = new THREE.MeshBasicMaterial({
       color: 0x8b5cf6,
       wireframe: true,
       transparent: true,
-      opacity: 0.15
+      opacity: 0.25
     });
 
     const node1 = new THREE.Mesh(nodeGeometry, nodeMaterial);
