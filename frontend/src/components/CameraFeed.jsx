@@ -25,7 +25,7 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
           stream = s;
           if (videoRef.current) {
             videoRef.current.srcObject = s;
-            videoRef.current.play();
+            videoRef.current.play().catch(() => {});
           }
           setWebcamActive(true);
           setWebcamError(null);

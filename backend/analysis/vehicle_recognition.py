@@ -22,13 +22,25 @@ def get_openai_client():
 def recognize_vehicle(image_base64):
     client = get_openai_client()
     
-    # Candidate vision models with fallback
+    # Priority list of vision models (including OpenRouter auto-router openrouter/free)
     models = [
-        "google/gemma-4-26b-a4b-it:free",
+        "openrouter/free",
         "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "google/gemini-2.0-flash-exp:free"
+        "qwen/qwen2.5-vl-32b-instruct:free",
+        "google/gemma-3-4b-it:free",
+        "mistralai/mistral-small-3.1-24b-instruct:free",
+        "google/gemma-4-26b-a4b-it:free"
     ]
     
+    prompt_text = """Identify the vehicle in this image.
+Return only in this format:
+Brand: <Manufacturer/Company name, e.g. Toyota, Honda, Tesla, BMW, Ford>
+Model: <Model name, e.g. Civic, Model 3, Camry, Mustang>
+Type: <e.g. Sedan, SUV, Truck, Hatchback, Motorcycle>
+Confidence: <High, Medium, or Low>
+
+If you cannot determine the exact brand or model, write Unknown."""
+
     last_error = None
     for model_name in models:
         try:
@@ -40,14 +52,7 @@ def recognize_vehicle(image_base64):
                         "content": [
                             {
                                 "type": "text",
-                                "text": """Identify the vehicle in this image.
-Return only:
-Brand: ...
-Model: ...
-Type: ...
-Confidence: ...
-
-If you cannot determine the exact brand or model, write Unknown instead of guessing."""
+                                "text": prompt_text
                             },
                             {
                                 "type": "image_url",
@@ -58,13 +63,17 @@ If you cannot determine the exact brand or model, write Unknown instead of guess
                         ]
                     }
                 ],
-                timeout=25
+                timeout=20
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if content and ("brand:" in content.lower() or "model:" in content.lower()):
+                return content
+            elif content:
+                return content
         except Exception as e:
             last_error = e
             continue
             
-    if last_error:
-        raise last_error
+    # Graceful fallback instead of crashing
+    print(f"[vehicle_recognition] Notice: OpenRouter fallback used due to: {last_error}")
     return "Brand: Unknown\nModel: Unknown\nType: Car\nConfidence: Low"

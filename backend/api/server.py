@@ -297,6 +297,7 @@ def api_person_directory():
 
 # Module 1-C — batch upload from gallery / browser files (persons)
 @app.route("/api/person/batch_upload", methods=["POST"])
+@app.route("/api/person/upload", methods=["POST"])
 def api_person_batch_upload():
     try:
         uploaded_files = request.files.getlist("files")
@@ -444,6 +445,7 @@ def api_vehicle_directory():
 
 # Module 2-B — batch upload from gallery / browser files (vehicles)
 @app.route("/api/vehicle/batch_upload", methods=["POST"])
+@app.route("/api/vehicle/upload", methods=["POST"])
 def api_vehicle_batch_upload():
     try:
         uploaded_files = request.files.getlist("files")
