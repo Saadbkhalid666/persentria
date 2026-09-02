@@ -1,7 +1,5 @@
 import cv2
 import time
-import base64
-
 from inputs.camera import (
     open_camera,
     read_frame,
@@ -9,34 +7,11 @@ from inputs.camera import (
 )
 
 from processing.process_frame import process_frame
-from analysis.vehicle_recognition import recognize_vehicle
 
 
  
-vehicle_cache = {}
 
 
-def encode_car_crop(frame, bbox):
-    x1, y1, x2, y2 = bbox
-
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(frame.shape[1], x2)
-    y2 = min(frame.shape[0], y2)
-
-    crop = frame[y1:y2, x1:x2]
-
-    if crop.size == 0:
-        return None
-
-    success, buffer = cv2.imencode(".jpg", crop)
-
-    if not success:
-        return None
-
-    return base64.b64encode(
-        buffer
-    ).decode("utf-8")
 
 
 def draw_people(frame, people):
@@ -67,43 +42,6 @@ def draw_people(frame, people):
         )
 
 
-def draw_cars(frame, cars, vehicle_cache):
-
-    for car in cars:
-
-        x1, y1, x2, y2 = car["bbox"]
-        car_id = car["track_id"]
-
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            (255, 0, 0),
-            2
-        )
-
-        label = f"Car #{car_id}"
-
-        if car_id in vehicle_cache:
-
-            vehicle_result = vehicle_cache[car_id]
-
-            vehicle_result = vehicle_result.replace(
-                "\n",
-                " | "
-            )
-
-            label = f"Car #{car_id} | {vehicle_result}"
-
-        cv2.putText(
-            frame,
-            label,
-            (x1, max(25, y1 - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (255, 0, 0),
-            2
-        )
 
 
 def draw_face_mesh(frame, faces):
@@ -168,45 +106,7 @@ def main():
 
             cars = results["cars"]
 
-            for car in cars:
-
-                car_id = car["track_id"]
-                if car_id in vehicle_cache:
-                    continue
-
-                image_base64 = encode_car_crop(
-                    frame,
-                    car["bbox"]
-                )
-
-                if image_base64 is None:
-                    continue
-
-                print(
-                    f"\nRecognizing Car #{car_id}..."
-                )
-
-                try:
-
-                    vehicle_result = recognize_vehicle(
-                        image_base64
-                    )
-
-                    vehicle_cache[car_id] = (
-                        vehicle_result
-                    )
-
-                    print(
-                        f"Car #{car_id} | "
-                        f"{vehicle_result}"
-                    )
-
-                except Exception as e:
-
-                    print(
-                        f"Vehicle recognition failed "
-                        f"for Car #{car_id}: {e}"
-                    )
+            
 
             draw_cars(
                 frame,
