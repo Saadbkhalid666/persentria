@@ -34,6 +34,31 @@ def draw_people(frame, people):
             2
         )
 
+def draw_cars(frame, cars):
+
+    for car in cars:
+
+        x1, y1, x2, y2 = car["bbox"]
+        car_id = car["track_id"]
+
+        cv2.rectangle(
+            frame,
+            (x1, y1),
+            (x2, y2),
+            (255, 0, 0),
+            2
+        )
+
+        cv2.putText(
+            frame,
+            f"Car #{car_id}",
+            (x1, y1 - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 0, 0),
+            2
+        )
+
 def draw_face_landmarks(frame, face_results):
     h, w = frame.shape[:2]
 
@@ -102,6 +127,9 @@ def main():
             people = results["people"]
             draw_people(frame, people)
 
+            cars = results["cars"]
+            draw_cars(frame, cars)
+
             for person in results["faces"]:
                 print(
                     f"Person #{person['person_id']} | "
@@ -123,6 +151,15 @@ def main():
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1,
                 (0, 255, 0),
+                2
+            )
+            cv2.putText(
+                frame,
+                f"Cars: {len(cars)}",
+                (20, 75),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 0, 0),
                 2
             )
 

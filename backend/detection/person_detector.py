@@ -17,7 +17,7 @@ def detect_people(model, frame, confidence=0.5):
             class_id = int(box.cls[0])
             score = float(box.conf[0])
 
-            # COCO class 0 = person
+          
             if class_id != 0:
                 continue
 

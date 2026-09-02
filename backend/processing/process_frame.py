@@ -1,5 +1,5 @@
 from detection.person_detector import load_model
-from tracking.object_tracker import track_people, detect_entry_exit
+from tracking.object_tracker import track_people, detect_entry_exit, track_cars
 from detection.face_analyzer import create_face_landmarker, analyze_faces
 from analysis.face_person_matcher import match_faces_to_people
 from analysis.eye_state import get_eye_state
@@ -11,6 +11,7 @@ from analysis.sitting_standing import (
 
 
 model = load_model()
+car_model = load_car_model()
 landmarker = create_face_landmarker()
 pose_landmarker = create_pose_landmarker()
 
@@ -36,6 +37,10 @@ def process_frame(frame, timestamp_ms):
         landmarker,
         frame,
         timestamp_ms
+    )
+    cars = track_cars(
+        model,
+        frame
     )
 
     matches = match_faces_to_people(
@@ -71,8 +76,9 @@ def process_frame(frame, timestamp_ms):
         })
 
     return {
-        "people": people,
-        "events": events,
-        "faces": results,
-        "postures": postures
-    }
+    "people": people,
+    "cars": cars,
+    "events": events,
+    "faces": results,
+    "postures": postures
+}
