@@ -1,68 +1,52 @@
-import React, { useState } from 'react';
-import { Eye, Wifi, WifiOff, Volume2, VolumeX, Maximize, Cpu, ShieldCheck } from 'lucide-react';
+import React from 'react';
+import { Activity, ShieldCheck, Video, Cpu, Sparkles } from 'lucide-react';
 import ModeSelector from './ModeSelector';
 
-export default function Header({ isConnected, mode, onModeChange }) {
-  const [audioEnabled, setAudioEnabled] = useState(false);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-  };
-
+export default function Header({ isConnected, isBackendOnline, mode, onModeChange, activeSubTab, onSubTabChange }) {
   return (
-    <header className="glass-panel rounded-2xl p-4 mb-4 border border-slate-200 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
-      {/* Title & Brand logo */}
+    <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-slate-900/80 border border-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl">
+      {/* Brand & Logo */}
       <div className="flex items-center gap-3">
-        <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm text-white">
-          <Eye className="w-6 h-6" />
+        <div className="relative">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+            <Cpu className="w-5 h-5 text-white" />
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
         </div>
+
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-            VisionX
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-mono font-medium">
-              v1.0 REAL-TIME
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-black tracking-wider text-white font-mono uppercase bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
+              PERSENTRIA AI
+            </h1>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono font-semibold">
+              v2.0 PRO
             </span>
-          </h1>
-          <p className="text-xs text-slate-500">
-            Real-Time AI Scene Intelligence Platform
+          </div>
+          <p className="text-xs text-slate-400">
+            Real-Time Scene Intelligence • YOLOv11 + MediaPipe + Gemma Multimodal
           </p>
         </div>
       </div>
 
-      {/* Center: Mode Selector */}
-      <ModeSelector currentMode={mode} onModeChange={onModeChange} />
+      {/* Mode & Navigation Tabs */}
+      <div className="flex flex-wrap items-center gap-3">
+        <ModeSelector
+          currentMode={mode}
+          onModeChange={onModeChange}
+          activeSubTab={activeSubTab}
+          onSubTabChange={onSubTabChange}
+        />
+      </div>
 
-      {/* Right Controls */}
-      <div className="flex items-center gap-3">
-        {/* Connection Status Badge */}
-        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border ${isConnected ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
-          {isConnected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-          {isConnected ? 'FastAPI Live' : 'Simulated Stream'}
+      {/* System Status Indicators */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-mono">
+          <div className={`w-2 h-2 rounded-full ${isBackendOnline ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-amber-400'}`} />
+          <span className="text-slate-300">
+            {isBackendOnline ? 'Flask Backend: Connected' : 'Flask Backend: Offline'}
+          </span>
         </div>
-
-        {/* Audio Alert Toggle */}
-        <button
-          onClick={() => setAudioEnabled(!audioEnabled)}
-          className={`p-2 rounded-xl border transition ${audioEnabled ? 'bg-purple-100 border-purple-200 text-purple-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
-          title="Toggle Sound Alerts"
-        >
-          {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-        </button>
-
-        {/* Fullscreen Button */}
-        <button
-          onClick={toggleFullscreen}
-          className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 transition"
-          title="Toggle Fullscreen"
-        >
-          <Maximize className="w-4 h-4" />
-        </button>
       </div>
     </header>
   );

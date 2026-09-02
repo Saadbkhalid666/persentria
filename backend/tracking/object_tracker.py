@@ -1,10 +1,8 @@
 from collections import defaultdict, deque
 
 
-# Stores recent center positions for each person
 movement_history = defaultdict(lambda: deque(maxlen=20))
 
-# Stores IDs from the previous frame
 previous_ids = set()
 
 
@@ -72,28 +70,34 @@ def detect_entry_exit(people):
 def track_cars(model, frame, confidence=0.5):
     results = model.track(
         frame,
-        persist = True,
-        tracker = "bytrack.yml",
-        conf = confidence,
-        classes = [2],
-        verbose = False
+        persist=True,
+        tracker="bytetrack.yaml",
+        conf=confidence,
+        classes=[2, 3, 5, 7],
+        verbose=False
     )
+
     cars = []
 
     result = results[0]
+
     if result.boxes is None or result.boxes.id is None:
         return cars
 
     boxes = result.boxes
 
-    for box, track_id in zip(boxes.xyxy, boxes.id):
-        x1,y1,x2,y2 = map(int, box)
+    for box, track_id in zip(
+        boxes.xyxy,
+        boxes.id
+    ):
+
+        x1, y1, x2, y2 = map(int, box)
+
         car_id = int(track_id)
 
-        center_x = (x1+x2)//2
-        center_y = (y1+y2)//2
+        center_x = (x1 + x2) // 2
+        center_y = (y1 + y2) // 2
 
-        
         cars.append({
             "track_id": car_id,
             "class": "car",
@@ -101,4 +105,4 @@ def track_cars(model, frame, confidence=0.5):
             "center": [center_x, center_y]
         })
 
-    return cars
+    return cars 
