@@ -45,18 +45,31 @@ export const scanVehicleDirectory = async (directoryPath, aiRecognition = true) 
   return data;
 };
 
-export const uploadPersonImage = async (file) => {
+export const uploadPersonFiles = async (files) => {
   const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch(`${API_BASE}/person/upload`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error('Upload failed');
-  return res.json();
+  for (let i = 0; i < files.length; i++) {
+    fd.append('files', files[i]);
+  }
+  const res = await fetch(`${API_BASE}/person/batch_upload`, {
+    method: 'POST',
+    body: fd,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data;
 };
 
-export const uploadVehicleImage = async (file) => {
+export const uploadVehicleFiles = async (files, aiRecognition = true) => {
   const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch(`${API_BASE}/vehicle/upload`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error('Upload failed');
-  return res.json();
+  for (let i = 0; i < files.length; i++) {
+    fd.append('files', files[i]);
+  }
+  fd.append('ai_recognition', aiRecognition ? 'true' : 'false');
+  const res = await fetch(`${API_BASE}/vehicle/batch_upload`, {
+    method: 'POST',
+    body: fd,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data;
 };

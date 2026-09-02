@@ -75,12 +75,16 @@ export default function App() {
         },
       });
     }
+    const scanLabel = scanData.directory
+      ? `directory "${scanData.directory}"`
+      : `${scanData.total_images} image(s) from gallery`;
+
     setEvents((prev) => [
       {
         id:        `scan-${Date.now()}`,
         timestamp: new Date().toLocaleTimeString(),
         type:      'DIRECTORY_SCAN_COMPLETED',
-        message:   `Scanned "${scanData.directory}" — ${scanData.total_images} images processed`,
+        message:   `Processed ${scanLabel} — completed successfully`,
       },
       ...prev,
     ].slice(0, 50));
