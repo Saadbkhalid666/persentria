@@ -1,4 +1,3 @@
-import os
 import math
 import cv2
 import mediapipe as mp
@@ -6,16 +5,12 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-MODEL_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    "models",
-    "pose_landmarker_full.task"
-)
+import config
 
 
 def create_pose_landmarker():
     base_options = python.BaseOptions(
-        model_asset_path=MODEL_PATH
+        model_asset_path=config.POSE_LANDMARKER_MODEL_PATH
     )
 
     options = vision.PoseLandmarkerOptions(
@@ -92,7 +87,7 @@ def analyze_posture(
         image_format=mp.ImageFormat.SRGB,
         data=rgb_frame
     )
-    
+
     result = landmarker.detect_for_video(
         mp_image,
         timestamp_ms
@@ -142,10 +137,10 @@ def analyze_posture(
                 right_knee_angle
             ) / 2
 
-            if average_knee_angle > 155:
+            if average_knee_angle > config.STANDING_KNEE_ANGLE:
                 state = "standing"
 
-            elif average_knee_angle < 145:
+            elif average_knee_angle < config.SITTING_KNEE_ANGLE:
                 state = "sitting"
 
             else:
