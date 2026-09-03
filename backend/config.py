@@ -56,12 +56,11 @@ SITTING_KNEE_ANGLE = 145
 # and "google/gemma-4-26b-a4b-it:free" (previous list) are not real
 # model slugs and would only ever fail before falling through.
 VEHICLE_AI_MODELS = [
-    "google/gemma-3-4b-it:free",
+    "google/gemma-2-9b-it:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
-    "qwen/qwen2.5-vl-32b-instruct:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "openai/gpt-4o-mini",
 ]
-VEHICLE_AI_TIMEOUT = 20
+VEHICLE_AI_TIMEOUT = 15
 
 # ── Gallery / directory batch scanning ────────────────────────
 BATCH_IMAGE_LIMIT = 40
