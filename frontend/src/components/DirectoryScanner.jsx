@@ -209,7 +209,7 @@ export default function DirectoryScanner({ mode, onScanResults, isScanning, setI
               onChange={(e) => setDirPath(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleRunProcessing()}
               placeholder={isTraffic ? 'e.g. C:\\Users\\Name\\Pictures\\cars' : 'e.g. C:\\Users\\Name\\Pictures\\people'}
-              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition"
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-mono focus:outline-none transition"
               disabled={isScanning}
             />
             <button
@@ -249,7 +249,7 @@ export default function DirectoryScanner({ mode, onScanResults, isScanning, setI
         onClick={handleRunProcessing}
         disabled={isScanning || (sourceType === 'gallery' ? selectedFiles.length === 0 : !dirPath.trim())}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition
-          bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500
+          bg-linear-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500
           disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20 font-mono"
       >
         {isScanning ? (
