@@ -1,6 +1,8 @@
 import math
 import time
 
+import config
+
 UPPER_LIP = 13
 LOWER_LIP = 14
 
@@ -9,7 +11,19 @@ RIGHT_MOUTH = 291
 
 talking_states = {}
 
-def calculate_distance(point1,point2):
+
+def reset_talking_states():
+    """
+    Clear all tracked talking state.
+
+    Call before scanning a standalone image (gallery/directory mode)
+    so movement counts don't leak over from an unrelated photo. Do NOT
+    call this in the webcam loop.
+    """
+    talking_states.clear()
+
+
+def calculate_distance(point1, point2):
     return math.sqrt((point1.x - point2.x) ** 2 +
     (point1.y - point2.y) ** 2
     )
@@ -33,8 +47,11 @@ def calculate_mouth_ratio(landmarks):
 def detect_talking(
     face_landmarks,
     person_id,
-    thresold = 0.08
+    threshold=None
 ):
+    if threshold is None:
+        threshold = config.TALKING_MOUTH_MOVEMENT_THRESHOLD
+
     mouth_ratio = calculate_mouth_ratio(
         face_landmarks
     )
@@ -55,7 +72,7 @@ def detect_talking(
         mouth_ratio - state["previous_ratio"]
     )
 
-    if difference > thresold:
+    if difference > threshold:
         state["movement_count"] += 1
         state["last_movement"] = current_time
 
@@ -66,8 +83,8 @@ def detect_talking(
     )
 
     if (
-        state["movement_count"] >= 3
-        and time_since_movement < 0.8
+        state["movement_count"] >= config.TALKING_MIN_MOVEMENT_COUNT
+        and time_since_movement < config.TALKING_MOVEMENT_WINDOW
     ):
         state["talking"] = True
     else:
@@ -78,4 +95,3 @@ def detect_talking(
         "mouth_ratio": mouth_ratio,
         "movement_count": state["movement_count"]
     }
-        

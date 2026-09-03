@@ -1,16 +1,12 @@
-from pathlib import Path
-
 import cv2
 import mediapipe as mp
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "models" / "face_landmarker.task"
+import config
 
 
 def create_face_landmarker():
     base_options = mp.tasks.BaseOptions(
-        model_asset_path=str(MODEL_PATH)
+        model_asset_path=config.FACE_LANDMARKER_MODEL_PATH
     )
 
     options = mp.tasks.vision.FaceLandmarkerOptions(

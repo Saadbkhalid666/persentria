@@ -1,5 +1,5 @@
 import cv2
-import time
+
 
 def open_camera(camera_index=0, width=1280, height=720, fps=30):
     camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
@@ -7,13 +7,12 @@ def open_camera(camera_index=0, width=1280, height=720, fps=30):
     if not camera.isOpened():
         raise RuntimeError("Could not Open Camera")
 
-    camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
-
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    camera.set(cv2.CAP_PROP_FPS, fps)   
+    camera.set(cv2.CAP_PROP_FPS, fps)
 
     return camera
+
 
 def read_frame(camera):
     success, frame = camera.read()
@@ -21,6 +20,7 @@ def read_frame(camera):
     if not success:
         raise RuntimeError("failed to read frame")
     return frame
+
 
 def release_camera(camera):
     camera.release()

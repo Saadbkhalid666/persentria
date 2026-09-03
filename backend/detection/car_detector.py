@@ -1,19 +1,20 @@
 from ultralytics import YOLO
 
-
-MODEL_PATH = "yolo11n.pt"
+import config
 
 
 def load_car_model():
-    return YOLO(MODEL_PATH)
+    return YOLO(config.YOLO_MODEL_PATH)
 
 
-def detect_cars(model, frame, confidence=0.5):
+def detect_cars(model, frame, confidence=None):
+    if confidence is None:
+        confidence = config.CAR_CONFIDENCE
 
     results = model(
         frame,
         conf=confidence,
-        classes=[2],  
+        classes=config.CAR_CLASS_IDS,
         verbose=False
     )
 

@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from openai import OpenAI
 
+import config
+
 # Ensure OPENROUTER_API_KEY is loaded from .env
 env_file = Path(__file__).resolve().parent.parent / ".env"
 if env_file.exists():
@@ -12,6 +14,7 @@ if env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
+
 def get_openai_client():
     api_key = os.getenv("OPENROUTER_API_KEY")
     return OpenAI(
@@ -19,19 +22,10 @@ def get_openai_client():
         api_key=api_key
     )
 
+
 def recognize_vehicle(image_base64):
     client = get_openai_client()
-    
-    # Priority list of vision models (including OpenRouter auto-router openrouter/free)
-    models = [
-        "openrouter/free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "qwen/qwen2.5-vl-32b-instruct:free",
-        "google/gemma-3-4b-it:free",
-        "mistralai/mistral-small-3.1-24b-instruct:free",
-        "google/gemma-4-26b-a4b-it:free"
-    ]
-    
+
     prompt_text = """Identify the vehicle in this image.
 Return only in this format:
 Brand: <Manufacturer/Company name, e.g. Toyota, Honda, Tesla, BMW, Ford>
@@ -42,7 +36,7 @@ Confidence: <High, Medium, or Low>
 If you cannot determine the exact brand or model, write Unknown."""
 
     last_error = None
-    for model_name in models:
+    for model_name in config.VEHICLE_AI_MODELS:
         try:
             response = client.chat.completions.create(
                 model=model_name,
@@ -63,17 +57,15 @@ If you cannot determine the exact brand or model, write Unknown."""
                         ]
                     }
                 ],
-                timeout=20
+                timeout=config.VEHICLE_AI_TIMEOUT
             )
             content = response.choices[0].message.content
-            if content and ("brand:" in content.lower() or "model:" in content.lower()):
-                return content
-            elif content:
+            if content:
                 return content
         except Exception as e:
             last_error = e
             continue
-            
+
     # Graceful fallback instead of crashing
-    print(f"[vehicle_recognition] Notice: OpenRouter fallback used due to: {last_error}")
+    print(f"[vehicle_recognition] Notice: all models failed, last error: {last_error}")
     return "Brand: Unknown\nModel: Unknown\nType: Car\nConfidence: Low"

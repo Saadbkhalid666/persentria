@@ -18,7 +18,7 @@ export default function ModeSelector({ currentMode, onModeChange, activeSubTab, 
               onClick={() => onModeChange(id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 active
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20'
+                  ? 'bg-linear-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >

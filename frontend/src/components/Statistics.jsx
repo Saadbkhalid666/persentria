@@ -1,10 +1,10 @@
 import React from 'react';
-import { Users, Car, MessageSquare, Eye, AlertTriangle, UserCheck, UserX, Activity } from 'lucide-react';
+import { Users, Car, MessageSquare,   AlertTriangle, UserCheck, UserX, Activity } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
 
 const Stat = ({ label, value, icon: Icon, color = 'cyan', sub }) => (
   <div className="flex-1 min-w-[120px] bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-3 flex items-center gap-3">
-    <div className={`w-9 h-9 rounded-xl bg-${color}-500/10 border border-${color}-500/20 flex items-center justify-center flex-shrink-0`}>
+    <div className={`w-9 h-9 rounded-xl bg-${color}-500/10 border border-${color}-500/20 flex items-center justify-center shrink-0`}>
       <Icon className={`w-4.5 h-4.5 text-${color}-400`} />
     </div>
     <div className="min-w-0">

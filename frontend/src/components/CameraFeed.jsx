@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Video, Layers, Sparkles, Cpu, AlertCircle } from 'lucide-react';
-import { PROJECT_MODES } from '../lib/types';
 import { processPersonFrame } from '../lib/api';
 
 export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpdate }) {
@@ -11,11 +10,10 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
   const [webcamError, setWebcamError]     = useState(null);
   const [liveLatency, setLiveLatency]     = useState(null);
 
-  const videoRef         = useRef(null);
-  const canvasRef        = useRef(null);
-  const captureRef       = useRef(null);
+  const videoRef   = useRef(null);
+  const canvasRef  = useRef(null);
+  const captureRef = useRef(null);
 
-  // ── open / close webcam ──────────────────────────────
   useEffect(() => {
     let stream = null;
     if (webcamEnabled) {
@@ -44,7 +42,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
     return () => { stream?.getTracks().forEach((t) => t.stop()); };
   }, [webcamEnabled]);
 
-  // ── live inference loop ──────────────────────────────
   useEffect(() => {
     if (!webcamActive || !isBackendOnline) return;
     let busy = false;
@@ -56,7 +53,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
 
       busy = true;
       try {
-        // capture at 640×360 for speed
         let cap = captureRef.current;
         if (!cap) {
           cap = document.createElement('canvas');
@@ -76,23 +72,21 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
             fps: res.fps ?? Math.round(1000 / Math.max(res.latencyMs || 100, 1)),
           });
         }
-      } catch { /* ignore transient network errors */ } finally {
+      } catch { /* ignore transient errors */ } finally {
         busy = false;
       }
     };
 
-    const id = setInterval(loop, 300); // ~3 fps inference
+    const id = setInterval(loop, 300);
     return () => clearInterval(id);
   }, [webcamActive, isBackendOnline, onTelemetryUpdate]);
 
-  // ── canvas overlay ───────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // dark grid when webcam is off
     if (!webcamActive) {
       const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
       g.addColorStop(0, '#08101e');
@@ -111,11 +105,9 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
 
     if (!showBoxes || !data?.people) return;
 
-    // person bounding boxes
     data.people.forEach((p) => {
       let x, y, w, h;
       if (p.raw_bbox) {
-        // coords from 640×360 capture — scale to 800×450 canvas
         const sx = canvas.width / 640;
         const sy = canvas.height / 360;
         x = p.raw_bbox[0] * sx;
@@ -126,12 +118,12 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
         [x, y, w, h] = p.bbox;
       }
 
-      const isDrowsy  = p.drowsiness !== 'normal';
-      const isTalking = p.talking;
-      const color     = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : '#10b981';
-      const cLen      = 14;
+      const isSleeping = p.alertness === 'sleeping';
+      const isDrowsy   = p.alertness === 'drowsy';
+      const isTalking  = p.talking;
+      const color      = isSleeping ? '#dc2626' : isDrowsy ? '#f97316' : isTalking ? '#06b6d4' : '#10b981';
+      const cLen       = 14;
 
-      // corner reticles
       ctx.strokeStyle = color;
       ctx.lineWidth   = 2.5;
       [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy]) => {
@@ -144,7 +136,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
       ctx.fillStyle = `${color}12`;
       ctx.fillRect(x, y, w, h);
 
-      // id tag
       ctx.fillStyle = 'rgba(5,10,25,0.88)';
       ctx.fillRect(x, y - 22, 140, 20);
       ctx.strokeStyle = color;
@@ -154,22 +145,19 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
       ctx.font = 'bold 11px monospace';
       ctx.fillText(`#${p.id}  ${p.posture || ''}`, x + 5, y - 8);
 
-      // status strip
       ctx.fillStyle = 'rgba(5,10,25,0.88)';
       ctx.fillRect(x, y + h + 2, 155, 18);
       ctx.strokeRect(x, y + h + 2, 155, 18);
-      ctx.fillStyle = isDrowsy ? '#ef4444' : isTalking ? '#06b6d4' : '#64748b';
+      ctx.fillStyle = color;
       ctx.font = 'bold 10px sans-serif';
       ctx.fillText(
-        isDrowsy ? '⚠ Drowsy' : isTalking ? '🗣 Talking' : `👁 Eyes: ${p.eyes || 'open'}`,
+        isSleeping ? '😴 Sleeping' : isDrowsy ? '⚠️ Drowsy' : isTalking ? '🗣 Talking' : `👁 Eyes: ${p.eyes || 'open'}`,
         x + 5, y + h + 14
       );
 
-      // face mesh
       if (showMesh && p.faceLandmarks?.length) {
         ctx.fillStyle = '#06b6d4';
         p.faceLandmarks.forEach(({ x: fx, y: fy }) => {
-          // landmarks are normalised 0-1 (from mediapipe)
           const px = fx <= 1 ? fx * canvas.width  : fx;
           const py = fy <= 1 ? fy * canvas.height : fy;
           ctx.beginPath();
@@ -180,11 +168,8 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
     });
   }, [data, showBoxes, showMesh, webcamActive]);
 
-  const backendReady = isBackendOnline;
-
   return (
     <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-4 shadow-2xl flex flex-col h-full">
-      {/* toolbar */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
@@ -208,14 +193,12 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
           </button>
           <button
             onClick={() => setShowBoxes((v) => !v)}
-            title="Toggle Bounding Boxes"
             className={`p-1.5 rounded-xl border transition ${showBoxes ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
           >
             <Layers className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowMesh((v) => !v)}
-            title="Toggle Face Mesh"
             className={`p-1.5 rounded-xl border transition ${showMesh ? 'bg-violet-500/20 text-violet-400 border-violet-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
           >
             <Sparkles className="w-4 h-4" />
@@ -230,7 +213,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
         </div>
       )}
 
-      {/* video + canvas */}
       <div className="relative flex-1 rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
         <video
           ref={videoRef}
@@ -243,7 +225,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
           className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
         />
 
-        {/* corner HUD marks */}
         <div className="absolute inset-0 pointer-events-none z-20">
           <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-cyan-500 opacity-60" />
           <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-cyan-500 opacity-60" />
@@ -251,7 +232,6 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
           <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-cyan-500 opacity-60" />
         </div>
 
-        {/* top info bar */}
         <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg border border-slate-700/50 z-30 flex items-center gap-3 text-xs font-mono text-slate-400">
           <span className="flex items-center gap-1 text-cyan-400 font-bold">
             <Cpu className="w-3 h-3" /> YOLOv11 + MediaPipe
@@ -262,8 +242,7 @@ export default function CameraFeed({ data, mode, isBackendOnline, onTelemetryUpd
           <span>Latency: <b className="text-cyan-400">{liveLatency != null ? `${liveLatency}ms` : '–'}</b></span>
         </div>
 
-        {/* offline / backend warning */}
-        {!backendReady && webcamEnabled && (
+        {!isBackendOnline && webcamEnabled && (
           <div className="absolute inset-0 z-40 flex items-center justify-center">
             <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl px-6 py-4 text-center space-y-2">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
