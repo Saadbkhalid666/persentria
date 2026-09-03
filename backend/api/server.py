@@ -3,7 +3,6 @@ import sys
 import glob
 import time
 import base64
-import threading
 import cv2
 import numpy as np
 from pathlib import Path
@@ -30,13 +29,14 @@ if env_path.exists():
 # Import existing backend modules (heavy models)
 # ─────────────────────────────────────────────
 print("[server] Loading AI models …")
+import config
 from processing.process_frame import process_frame          # loads YOLO + MediaPipe
 from detection.person_detector import load_model            # YOLO
 from tracking.object_tracker import track_cars
 from analysis.vehicle_recognition import recognize_vehicle
 print("[server] Models loaded ✓")
 
-_YOLO_MODEL = load_model()   # shared instance
+_YOLO_MODEL = load_model()   # shared instance, reused for vehicle-only routes
 
 # ─────────────────────────────────────────────
 # Flask app
@@ -94,6 +94,19 @@ def _parse_vehicle_ai(text: str) -> dict:
     return {"brand": brand, "model": model, "type": vtype, "confidence": confidence}
 
 
+def _alertness_state(eyes_state: str, closed_duration: float) -> str:
+    """Three tiers instead of a single 'drowsy' flag: a normal blink
+    is brief, sustained closure is drowsy, and closure well past that
+    is treated as asleep."""
+    if eyes_state != "closed":
+        return "normal"
+    if closed_duration >= config.SLEEPING_DURATION:
+        return "sleeping"
+    if closed_duration >= config.DROWSY_DURATION:
+        return "drowsy"
+    return "normal"
+
+
 def _annotate_person_frame(frame, people, faces, postures):
     out = frame.copy()
     face_map = {f["person_id"]: f for f in (faces or [])}
@@ -101,11 +114,33 @@ def _annotate_person_frame(frame, people, faces, postures):
         x1, y1, x2, y2 = p["bbox"]
         pid = p["track_id"]
         face = face_map.get(pid, {})
-        is_drowsy = face.get("eye_state", {}).get("state") == "closed"
+        eye = face.get("eye_state", {})
+        alertness = _alertness_state(eye.get("state", "open"), eye.get("closed_duration", 0))
         is_talking = face.get("talking", {}).get("talking", False)
-        color = (0, 0, 220) if is_drowsy else ((0, 140, 255) if is_talking else (0, 200, 80))
+        is_smiling = face.get("smile", {}).get("smiling", False)
+
+        if alertness == "sleeping":
+            color = (0, 0, 220)
+        elif alertness == "drowsy":
+            color = (0, 100, 220)
+        elif is_talking:
+            color = (0, 140, 255)
+        else:
+            color = (0, 200, 80)
+
         cv2.rectangle(out, (x1, y1), (x2, y2), color, 2)
-        tag = f"#{pid} {'DROWSY' if is_drowsy else 'TALKING' if is_talking else 'ACTIVE'}"
+
+        if alertness == "sleeping":
+            tag = f"#{pid} SLEEPING"
+        elif alertness == "drowsy":
+            tag = f"#{pid} DROWSY"
+        elif is_talking:
+            tag = f"#{pid} TALKING"
+        elif is_smiling:
+            tag = f"#{pid} SMILING"
+        else:
+            tag = f"#{pid} ACTIVE"
+
         tw, th = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
         cv2.rectangle(out, (x1, max(0, y1-18)), (x1+tw+6, y1), (0, 0, 0), -1)
         cv2.putText(out, tag, (x1+3, max(14, y1-4)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
@@ -138,36 +173,52 @@ def _format_person_telemetry(people, faces, postures) -> list:
         face = face_map.get(pid, {})
         eye = face.get("eye_state", {})
         talk = face.get("talking", {})
+        smile = face.get("smile", {})
+
         is_talking = bool(talk.get("talking", False))
+        is_smiling = bool(smile.get("smiling", False))
         eyes_state = eye.get("state", "open")
         closed_dur = eye.get("closed_duration", 0)
-        is_drowsy = eyes_state == "closed" and closed_dur > 1.5
+        alertness = _alertness_state(eyes_state, closed_dur)
+
         result.append({
             "id": pid,
             "name": f"Person #{pid}",
             "bbox": [x1, y1, x2 - x1, y2 - y1],
             "raw_bbox": [x1, y1, x2, y2],
             "talking": is_talking,
+            "smiling": is_smiling,
             "eyes": eyes_state,
             "blinks": eye.get("blink_count", 0),
             "closed_duration": round(closed_dur, 2),
             "mouth_ratio": round(talk.get("mouth_ratio", 0), 3),
             "posture": posture_state,
             "movement": "moving" if len(p.get("history", [])) > 2 else "stationary",
-            "drowsiness": "possible drowsiness" if is_drowsy else "normal",
+            "alertness": alertness,          # "normal" | "drowsy" | "sleeping"
+            "drowsiness": "possible drowsiness" if alertness in ("drowsy", "sleeping") else "normal",
             "confidence": 0.95,
             "faceLandmarks": _serialize_lm(face.get("landmarks", []))
         })
     return result
 
 
-def _collect_images(directory: str, limit: int = 40) -> list:
+def _collect_images(directory: str, limit: int = None) -> list:
+    if limit is None:
+        limit = config.BATCH_IMAGE_LIMIT
     exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.webp"]
     files = []
     for ext in exts:
         files += glob.glob(str(Path(directory) / ext))
         files += glob.glob(str(Path(directory) / ext.upper()))
     return sorted(set(files))[:limit]
+
+
+def _resize_thumb(frame):
+    if frame.shape[1] > config.BATCH_THUMBNAIL_MAX_WIDTH:
+        w = config.BATCH_THUMBNAIL_MAX_WIDTH
+        h = int(frame.shape[0] * w / frame.shape[1])
+        return cv2.resize(frame, (w, h))
+    return frame
 
 
 # ──────────────── routes ────────────────────
@@ -177,7 +228,9 @@ def health():
     return jsonify({"status": "online", "service": "Persentria AI Backend"})
 
 
-# Module 1-A — live webcam frame from browser
+# Module 1-A — live webcam frame from browser (continuous stream:
+# reset_state stays False so tracking/blink/talking history persists
+# correctly frame-to-frame).
 @app.route("/api/person/process_frame", methods=["POST"])
 def api_person_frame():
     try:
@@ -201,10 +254,18 @@ def api_person_frame():
 
         formatted = _format_person_telemetry(people, faces, postures)
 
-        # Emit events only for high-priority alerts (drowsiness) to prevent log flooding
+        # Emit events only for high-priority alerts (drowsy/sleeping) to
+        # prevent log flooding.
         events_out = []
         for p in formatted:
-            if p["drowsiness"] != "normal":
+            if p["alertness"] == "sleeping":
+                events_out.append({
+                    "id": f"sleep-{p['id']}-{int(ts/1000)}",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "type": "PERSON_SLEEPING_ALERT",
+                    "message": f"😴 Sleeping alert — Person #{p['id']}"
+                })
+            elif p["alertness"] == "drowsy":
                 events_out.append({
                     "id": f"drowsy-{p['id']}-{int(ts/1000)}",
                     "timestamp": time.strftime("%H:%M:%S"),
@@ -214,7 +275,9 @@ def api_person_frame():
 
         stats = {
             "talkingCount": sum(1 for p in formatted if p["talking"]),
-            "drowsyCount": sum(1 for p in formatted if p["drowsiness"] != "normal"),
+            "smilingCount": sum(1 for p in formatted if p["smiling"]),
+            "drowsyCount": sum(1 for p in formatted if p["alertness"] == "drowsy"),
+            "sleepingCount": sum(1 for p in formatted if p["alertness"] == "sleeping"),
             "sittingCount": sum(1 for p in formatted if p["posture"] == "sitting"),
             "standingCount": sum(1 for p in formatted if p["posture"] == "standing"),
         }
@@ -233,7 +296,8 @@ def api_person_frame():
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 1-B — directory batch scan (persons)
+# Module 1-B — directory batch scan (persons). Each image is
+# unrelated to the others, so reset_state=True on every call.
 @app.route("/api/person/directory", methods=["POST"])
 def api_person_directory():
     try:
@@ -251,7 +315,7 @@ def api_person_directory():
             return jsonify({"error": "No image files found in that directory"}), 404
 
         results = []
-        total_people = total_talking = total_drowsy = 0
+        total_people = total_talking = total_smiling = total_drowsy = total_sleeping = 0
 
         for img_path in files:
             frame = cv2.imread(img_path)
@@ -259,7 +323,7 @@ def api_person_directory():
                 continue
             try:
                 ts = int(time.time() * 1000)
-                res = process_frame(frame, ts)
+                res = process_frame(frame, ts, reset_state=True)
                 people = res.get("people", [])
                 faces = res.get("faces", [])
                 postures = res.get("postures", [])
@@ -267,10 +331,12 @@ def api_person_directory():
 
                 total_people += len(fmt)
                 total_talking += sum(1 for p in fmt if p["talking"])
-                total_drowsy += sum(1 for p in fmt if p["drowsiness"] != "normal")
+                total_smiling += sum(1 for p in fmt if p["smiling"])
+                total_drowsy += sum(1 for p in fmt if p["alertness"] == "drowsy")
+                total_sleeping += sum(1 for p in fmt if p["alertness"] == "sleeping")
 
                 ann = _annotate_person_frame(frame, people, faces, postures)
-                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+                ann = _resize_thumb(ann)
                 thumb = _encode_b64(ann, 60)
 
                 results.append({
@@ -287,7 +353,9 @@ def api_person_directory():
             "total_images": len(results),
             "total_people_detected": total_people,
             "total_talking": total_talking,
+            "total_smiling": total_smiling,
             "total_drowsy": total_drowsy,
+            "total_sleeping": total_sleeping,
             "results": results,
         })
 
@@ -295,7 +363,8 @@ def api_person_directory():
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 1-C — batch upload from gallery / browser files (persons)
+# Module 1-C — batch upload from gallery / browser files (persons).
+# Same isolation as the directory route: reset_state=True per image.
 @app.route("/api/person/batch_upload", methods=["POST"])
 @app.route("/api/person/upload", methods=["POST"])
 def api_person_batch_upload():
@@ -308,7 +377,7 @@ def api_person_batch_upload():
                 return jsonify({"error": "No files uploaded"}), 400
 
         results = []
-        total_people = total_talking = total_drowsy = 0
+        total_people = total_talking = total_smiling = total_drowsy = total_sleeping = 0
         all_people = []
 
         for f in uploaded_files:
@@ -318,7 +387,7 @@ def api_person_batch_upload():
                 continue
 
             ts = int(time.time() * 1000)
-            res = process_frame(frame, ts)
+            res = process_frame(frame, ts, reset_state=True)
             people = res.get("people", [])
             faces = res.get("faces", [])
             postures = res.get("postures", [])
@@ -326,12 +395,13 @@ def api_person_batch_upload():
 
             total_people += len(fmt)
             total_talking += sum(1 for p in fmt if p["talking"])
-            total_drowsy += sum(1 for p in fmt if p["drowsiness"] != "normal")
+            total_smiling += sum(1 for p in fmt if p["smiling"])
+            total_drowsy += sum(1 for p in fmt if p["alertness"] == "drowsy")
+            total_sleeping += sum(1 for p in fmt if p["alertness"] == "sleeping")
             all_people.extend(fmt)
 
             ann = _annotate_person_frame(frame, people, faces, postures)
-            if ann.shape[1] > 640:
-                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+            ann = _resize_thumb(ann)
             thumb = _encode_b64(ann, 65)
 
             results.append({
@@ -346,7 +416,9 @@ def api_person_batch_upload():
             "total_images": len(results),
             "total_people_detected": total_people,
             "total_talking": total_talking,
+            "total_smiling": total_smiling,
             "total_drowsy": total_drowsy,
+            "total_sleeping": total_sleeping,
             "people": all_people,
             "results": results,
         })
@@ -355,7 +427,9 @@ def api_person_batch_upload():
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 2-A — directory batch scan (vehicles)
+# Module 2-A — directory batch scan (vehicles). persist=False so
+# ByteTrack doesn't try to carry car identities between unrelated
+# photos.
 @app.route("/api/vehicle/directory", methods=["POST"])
 def api_vehicle_directory():
     try:
@@ -382,7 +456,7 @@ def api_vehicle_directory():
             if frame is None:
                 continue
             try:
-                cars = track_cars(_YOLO_MODEL, frame)
+                cars = track_cars(_YOLO_MODEL, frame, persist=False)
                 catalog = {}
 
                 for car in cars:
@@ -418,8 +492,7 @@ def api_vehicle_directory():
                     all_vehicles.append(entry)
 
                 ann = _annotate_vehicle_frame(frame, cars, catalog)
-                if ann.shape[1] > 640:
-                    ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+                ann = _resize_thumb(ann)
                 thumb = _encode_b64(ann, 60)
 
                 results.append({
@@ -443,7 +516,8 @@ def api_vehicle_directory():
         return jsonify({"error": str(exc)}), 500
 
 
-# Module 2-B — batch upload from gallery / browser files (vehicles)
+# Module 2-B — batch upload from gallery / browser files (vehicles).
+# Same persist=False isolation as the directory route.
 @app.route("/api/vehicle/batch_upload", methods=["POST"])
 @app.route("/api/vehicle/upload", methods=["POST"])
 def api_vehicle_batch_upload():
@@ -466,7 +540,7 @@ def api_vehicle_batch_upload():
             if frame is None:
                 continue
 
-            cars = track_cars(_YOLO_MODEL, frame)
+            cars = track_cars(_YOLO_MODEL, frame, persist=False)
             catalog = {}
 
             for car in cars:
@@ -502,8 +576,7 @@ def api_vehicle_batch_upload():
                 all_vehicles.append(entry)
 
             ann = _annotate_vehicle_frame(frame, cars, catalog)
-            if ann.shape[1] > 640:
-                ann = cv2.resize(ann, (640, int(ann.shape[0] * 640 / ann.shape[1])))
+            ann = _resize_thumb(ann)
             thumb = _encode_b64(ann, 65)
 
             results.append({
@@ -526,6 +599,5 @@ def api_vehicle_batch_upload():
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    print(f"[server] Persentria listening on http://0.0.0.0:{port}")
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    print(f"[server] Persentria listening on http://0.0.0.0:{config.FLASK_PORT}")
+    app.run(host="0.0.0.0", port=config.FLASK_PORT, debug=config.FLASK_DEBUG, threaded=True)
