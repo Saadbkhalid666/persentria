@@ -76,7 +76,7 @@ def draw_cars(frame, cars, vehicle_results):
             )
 
 
-def draw_people(frame, people):
+def draw_people(frame, people, smile_map):
     for person in people:
 
         x1, y1, x2, y2 = person["bbox"]
@@ -90,9 +90,13 @@ def draw_people(frame, people):
             2
         )
 
+        label = f"Person ID: {person_id}"
+        if smile_map.get(person_id):
+            label += "  :)"
+
         cv2.putText(
             frame,
-            f"Person ID: {person_id}",
+            label,
             (x1, y1 - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
@@ -109,21 +113,30 @@ def main():
 
     frame = load_image(image_path)
 
+    # reset_state=True: this is a standalone photo, not a video frame,
+    # so we don't want leftover tracker/eye/talking state from any
+    # previous call bleeding into this one.
     results = process_frame(
         frame,
-        timestamp_ms=0
+        timestamp_ms=0,
+        reset_state=True
     )
 
-
     people = results["people"]
+    faces = results["faces"]
 
     print(f"\nPeople detected: {len(people)}")
 
+    smile_map = {
+        f["person_id"]: f["smile"]["smiling"]
+        for f in faces
+    }
+
     draw_people(
         frame,
-        people
+        people,
+        smile_map
     )
-
 
     cars = results["cars"]
 
@@ -169,7 +182,6 @@ def main():
         cars,
         vehicle_results
     )
-
 
     cv2.imshow(
         "Persentria - Image Analysis",
