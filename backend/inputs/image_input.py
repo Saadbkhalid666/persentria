@@ -1,5 +1,6 @@
 import cv2
 
+
 def load_image(image_path):
     frame = cv2.imread(image_path)
 
