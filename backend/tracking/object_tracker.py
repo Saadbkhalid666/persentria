@@ -1,18 +1,39 @@
 from collections import defaultdict, deque
 
+import config
+
 
 movement_history = defaultdict(lambda: deque(maxlen=20))
 
 previous_ids = set()
 
 
-def track_people(model, frame, confidence=0.5):
+def reset_person_tracking():
+    """
+    Clear all person-tracking state (movement history + entry/exit
+    bookkeeping).
+
+    Call this before processing a standalone image that has no
+    relationship to previous calls (gallery/directory scans). Without
+    this, track IDs and movement history from one unrelated photo
+    bleed into the next one in the same batch. Do NOT call this in the
+    webcam loop - continuity across frames is the whole point there.
+    """
+    global previous_ids
+    movement_history.clear()
+    previous_ids = set()
+
+
+def track_people(model, frame, confidence=None, persist=True):
+    if confidence is None:
+        confidence = config.PERSON_CONFIDENCE
+
     results = model.track(
         frame,
-        persist=True,
+        persist=persist,
         tracker="bytetrack.yaml",
         conf=confidence,
-        classes=[0],
+        classes=[config.PERSON_CLASS_ID],
         verbose=False
     )
 
@@ -67,13 +88,16 @@ def detect_entry_exit(people):
     }
 
 
-def track_cars(model, frame, confidence=0.5):
+def track_cars(model, frame, confidence=None, persist=True):
+    if confidence is None:
+        confidence = config.CAR_CONFIDENCE
+
     results = model.track(
         frame,
-        persist=True,
+        persist=persist,
         tracker="bytetrack.yaml",
         conf=confidence,
-        classes=[2, 3, 5, 7],
+        classes=config.CAR_CLASS_IDS,
         verbose=False
     )
 
@@ -105,4 +129,4 @@ def track_cars(model, frame, confidence=0.5):
             "center": [center_x, center_y]
         })
 
-    return cars 
+    return cars
