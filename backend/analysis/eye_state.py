@@ -1,6 +1,8 @@
 import math
 import time
 
+import config
+
 
 LEFT_EYE = [
     362, 385, 387, 263, 373, 380
@@ -12,6 +14,19 @@ RIGHT_EYE = [
 
 
 eye_states = {}
+
+
+def reset_eye_states():
+    """
+    Clear all tracked eye state.
+
+    Call this before scanning a standalone image (gallery/directory
+    mode) so blink counts and closed-duration timers don't leak over
+    from a previous, unrelated photo. Do NOT call this in the webcam
+    loop - continuity across frames is exactly what blink detection
+    depends on there.
+    """
+    eye_states.clear()
 
 
 def calculate_distance(point1, point2):
@@ -43,7 +58,10 @@ def calculate_eye_aspect_ratio(landmarks, eye_indices):
     return (vertical_1 + vertical_2) / (2 * horizontal)
 
 
-def get_eye_state(face_landmarks, person_id, threshold=0.20):
+def get_eye_state(face_landmarks, person_id, threshold=None):
+    if threshold is None:
+        threshold = config.EYE_CLOSED_THRESHOLD
+
     left_ratio = calculate_eye_aspect_ratio(
         face_landmarks,
         LEFT_EYE
@@ -85,7 +103,7 @@ def get_eye_state(face_landmarks, person_id, threshold=0.20):
             )
 
             # Short eye closure = blink
-            if 0.05 <= closed_duration <= 0.5:
+            if config.BLINK_MIN_DURATION <= closed_duration <= config.BLINK_MAX_DURATION:
                 state["blink_count"] += 1
 
             state["is_closed"] = False

@@ -2,7 +2,6 @@ import React from 'react';
 import { Users, Car, MessageSquare, Eye, AlertTriangle, Activity, Gauge, Info } from 'lucide-react';
 import { PROJECT_MODES } from '../lib/types';
 
-// ── Person card ──────────────────────────────────────
 function PersonCard({ person }) {
   const isDrowsy  = person.drowsiness !== 'normal';
   const isTalking = person.talking;
