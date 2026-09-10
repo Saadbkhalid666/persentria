@@ -57,17 +57,7 @@ def draw_people(frame, people, smile_map):
         label = f"Person #{person_id}"
         if smile_map.get(person_id):
             label += "  :)"
-
-        cv2.putText(
-            frame,
-            label,
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
-            2
-        )
-
+ 
 
 def draw_cars(frame, cars, vehicle_results):
     for car in cars:
@@ -115,27 +105,6 @@ def draw_cars(frame, cars, vehicle_results):
                 1
             )
 
-
-def draw_face_mesh(frame, faces):
-    height, width = frame.shape[:2]
-
-    for face in faces:
-        landmarks = face.get("landmarks")
-
-        if not landmarks:
-            continue
-
-        for landmark in landmarks:
-            x = int(landmark.x * width)
-            y = int(landmark.y * height)
-
-            cv2.circle(
-                frame,
-                (x, y),
-                1,
-                (0, 255, 0),
-                -1
-            )
 
 
 def main():
@@ -215,11 +184,6 @@ def main():
                 vehicle_cache
             )
 
-            draw_face_mesh(
-                frame,
-                faces
-            )
-
             for person in faces:
 
                 print(
@@ -240,25 +204,7 @@ def main():
                     f"Posture: {posture['state']}"
                 )
 
-            cv2.putText(
-                frame,
-                f"People: {len(people)}",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2
-            )
 
-            cv2.putText(
-                frame,
-                f"Cars: {len(cars)}",
-                (20, 75),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 0, 0),
-                2
-            )
 
             cv2.imshow(
                 "Persentria",

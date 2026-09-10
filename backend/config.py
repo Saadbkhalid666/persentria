@@ -32,7 +32,7 @@ PERSON_CLASS_ID = 0
 CAR_CLASS_IDS = [2, 3, 5, 7]  # COCO: car, motorcycle, bus, truck
 
 # ── Eyes / blinking / drowsiness / sleeping ───────────────────
-EYE_CLOSED_THRESHOLD = 0.20      # EAR below this = eyes closed
+EYE_CLOSED_THRESHOLD = 0.15      # EAR below this = eyes closed (MediaPipe EAR ~0.15-0.18 when closed)
 BLINK_MIN_DURATION = 0.05        # seconds - shorter closures are noise
 BLINK_MAX_DURATION = 0.5         # seconds - longer closures aren't blinks
 DROWSY_DURATION = 1.5            # seconds closed -> "drowsy"
@@ -44,8 +44,8 @@ TALKING_MIN_MOVEMENT_COUNT = 3
 TALKING_MOVEMENT_WINDOW = 0.8    # seconds
 
 # ── Smiling (heuristic - tune against real footage) ─────────────
-SMILE_WIDTH_RATIO_THRESHOLD = 0.42    # mouth_width / face_width
-SMILE_CORNER_LIFT_THRESHOLD = 0.006   # normalized corner lift
+SMILE_WIDTH_RATIO_THRESHOLD = 0.38    # mouth_width / face_width (relaxed from 0.42)
+SMILE_CORNER_LIFT_THRESHOLD = 0.003   # normalized corner lift (relaxed from 0.006)
 
 # ── Posture ────────────────────────────────────────────────────
 STANDING_KNEE_ANGLE = 155

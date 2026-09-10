@@ -25,6 +25,7 @@ def reset_person_tracking():
 
 
 def track_people(model, frame, confidence=None, persist=True):
+    """Track people across frames using ByteTrack (webcam / video mode)."""
     if confidence is None:
         confidence = config.PERSON_CONFIDENCE
 
@@ -64,6 +65,48 @@ def track_people(model, frame, confidence=None, persist=True):
             "bbox": [x1, y1, x2, y2],
             "center": [center_x, center_y],
             "history": list(movement_history[person_id])
+        })
+
+    return people
+
+
+def detect_people_image(model, frame, confidence=None):
+    """
+    Detect people in a standalone image using model.predict().
+
+    model.track(persist=False) returns boxes.id = None with ByteTrack,
+    so track_people() returns an empty list for standalone images.
+    predict() always returns boxes and we assign sequential IDs (1, 2…)
+    so the face matcher can pair each face to its own person box.
+    """
+    if confidence is None:
+        confidence = config.PERSON_CONFIDENCE
+
+    results = model.predict(
+        frame,
+        conf=confidence,
+        classes=[config.PERSON_CLASS_ID],
+        verbose=False
+    )
+
+    people = []
+    result = results[0]
+
+    if result.boxes is None:
+        return people
+
+    for idx, box in enumerate(result.boxes.xyxy, start=1):
+        x1, y1, x2, y2 = map(int, box)
+
+        center_x = (x1 + x2) // 2
+        center_y = (y1 + y2) // 2
+
+        people.append({
+            "track_id": idx,          # synthetic sequential ID per image
+            "class": "person",
+            "bbox": [x1, y1, x2, y2],
+            "center": [center_x, center_y],
+            "history": [(center_x, center_y)]
         })
 
     return people
