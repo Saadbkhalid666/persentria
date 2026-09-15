@@ -31,7 +31,6 @@ export default function Statistics({ data }) {
       <Stat label="Vehicles Detected" value={vcount} icon={Car} color="cyan" />
       <Stat label="AI Makes Identified" value={identifiedMakes} icon={Sparkles} color="emerald" sub="Gemma Vision" />
       <Stat label="Active Tracks" value={activeTracks} icon={Gauge} color="blue" sub="ByteTrack" />
-      <Stat label="Processing Speed" value={fps} icon={Activity} color="violet" sub={latency} />
     </div>
   );
 }

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ThreeBackground from './components/ThreeBackground';
 import Header from './components/Header';
 import Statistics from './components/Statistics';
-import CameraFeed from './components/CameraFeed';
 import DirectoryScanner from './components/DirectoryScanner';
 import Sidebar from './components/Sidebar';
 import EventLog from './components/EventLog';
@@ -121,19 +120,13 @@ export default function App() {
           {/* Left / Center — Camera or Directory Scanner */}
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             <div className="flex-1 min-h-0">
-              {activeSubTab === VIEW_TABS.WEBCAM ? (
-                <CameraFeed
-                  data={telemetry}
-                  isBackendOnline={isBackendOnline}
-                  onTelemetryUpdate={handleLiveTelemetry}
-                />
-              ) : (
-                <DirectoryScanner
-                  onScanResults={handleScanResults}
-                  isScanning={isScanning}
-                  setIsScanning={setIsScanning}
-                />
-              )}
+               
+              <DirectoryScanner
+                onScanResults={handleScanResults}
+                isScanning={isScanning}
+                setIsScanning={setIsScanning}
+              />
+
             </div>
 
             {/* Bottom row: event log + chart */}

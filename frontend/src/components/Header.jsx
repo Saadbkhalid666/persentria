@@ -14,18 +14,12 @@ export default function Header({ isBackendOnline, activeSubTab, onSubTabChange }
         <div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-black tracking-widest text-white font-mono uppercase">PERSENTRIA VEHICLE AI</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono">v2.0</span>
           </div>
           <p className="text-[10px] text-slate-500 font-mono">YOLOv11 · ByteTrack · Multimodal Vision AI</p>
         </div>
       </div>
 
-      {/* Sub-tab Selector */}
-      <ModeSelector
-        activeSubTab={activeSubTab}
-        onSubTabChange={onSubTabChange}
-      />
-
+       
       {/* Backend status */}
       <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono border ${
         isBackendOnline
