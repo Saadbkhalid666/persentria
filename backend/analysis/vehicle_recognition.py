@@ -3,7 +3,7 @@ from pathlib import Path
 from openai import OpenAI
 import config
 
-# Load .env variables
+ 
 env_file = Path(__file__).resolve().parent.parent / ".env"
 if env_file.exists():
     with open(env_file, "r") as f:
@@ -13,7 +13,6 @@ if env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
-# Vision-capable models on OpenRouter (ordered by speed and accuracy)
 DEFAULT_VEHICLE_AI_MODELS = [
     "inclusionai/ling-3.0-flash-vl:free",
     "dots-studio/dots-3-note-preview:free",
@@ -48,7 +47,6 @@ def recognize_vehicle(image_base64: str) -> str:
         "If brand or model cannot be identified with certainty, write Unknown for that field."
     )
 
-    # Format data URL properly
     if image_base64.startswith("data:image"):
         data_url = image_base64
     else:
@@ -81,7 +79,6 @@ def recognize_vehicle(image_base64: str) -> str:
             content = response.choices[0].message.content
             if content:
                 lower = content.lower()
-                # Ensure the model actually returned brand/model info rather than a refusal or safety tag
                 if "brand:" in lower or "model:" in lower or "make:" in lower:
                     print(f"[vehicle_recognition] Success with {model_name}:\n{content.strip()}")
                     return content
