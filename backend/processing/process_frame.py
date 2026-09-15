@@ -5,7 +5,6 @@ from tracking.object_tracker import (
     reset_vehicle_tracking
 )
 
-# Shared YOLO instance for vehicle detection and tracking
 model = load_car_model()
 
 
