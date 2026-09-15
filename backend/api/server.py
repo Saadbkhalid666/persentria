@@ -10,9 +10,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# ─────────────────────────────────────────────
-# Bootstrap: paths & environment
-# ─────────────────────────────────────────────
+ 
 BACKEND_DIR = str(Path(__file__).resolve().parent.parent)
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
@@ -26,9 +24,7 @@ if env_path.exists():
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip())
 
-# ─────────────────────────────────────────────
-# Import vehicle AI models
-# ─────────────────────────────────────────────
+ 
 print("[server] Loading Vehicle AI models …")
 import config
 from detection.car_detector import load_car_model
@@ -38,19 +34,14 @@ print("[server] Vehicle models loaded ✓")
 
 _YOLO_MODEL = load_car_model()
 
-# Live cache for webcam tracks
 _live_catalog = {}
 _recognition_lock = threading.Lock()
 _pending_recognitions = set()
 
-# ─────────────────────────────────────────────
-# Flask app
-# ─────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 
-# ──────────────── helpers ────────────────────
 
 def _encode_b64(frame: np.ndarray, quality: int = 78) -> str | None:
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
@@ -90,7 +81,6 @@ def _parse_vehicle_ai(text: str) -> dict:
             if v:
                 confidence = v
 
-    # Fallback heuristic if standard tags were omitted
     if brand == "Unknown" and model == "Unknown" and len(text.splitlines()) <= 3:
         for word in ["Honda", "Toyota", "Ford", "Chevrolet", "BMW", "Mercedes", "Audi", "Tesla", "Nissan", "Hyundai", "Kia", "Volkswagen", "Lada", "GAZ", "UAZ"]:
             if word.lower() in text.lower():
@@ -137,7 +127,6 @@ def _annotate_vehicle_frame(frame, cars, catalog: dict):
         else:
             label = f"{vtype} #{cid}"
 
-        # Vehicle bbox in cyan
         cv2.rectangle(out, (x1, y1), (x2, y2), (0, 200, 255), 2)
         tw, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
         cv2.rectangle(out, (x1, max(0, y1 - 20)), (x1 + tw + 8, y1), (0, 0, 0), -1)
@@ -164,7 +153,6 @@ def _resize_thumb(frame):
     return frame
 
 
-# ──────────────── routes ────────────────────
 
 @app.route("/api/health", methods=["GET"])
 def health():
@@ -175,7 +163,6 @@ def health():
     })
 
 
-# Live continuous webcam / video frame processing for vehicles
 @app.route("/api/vehicle/process_frame", methods=["POST"])
 def api_vehicle_process_frame():
     try:
@@ -265,7 +252,6 @@ def api_vehicle_process_frame():
         return jsonify({"error": str(exc)}), 500
 
 
-# Directory batch scan for vehicles
 @app.route("/api/vehicle/directory", methods=["POST"])
 def api_vehicle_directory():
     try:
@@ -352,7 +338,6 @@ def api_vehicle_directory():
         return jsonify({"error": str(exc)}), 500
 
 
-# Batch upload from gallery / browser files (vehicles)
 @app.route("/api/vehicle/batch_upload", methods=["POST"])
 @app.route("/api/vehicle/upload", methods=["POST"])
 def api_vehicle_batch_upload():
