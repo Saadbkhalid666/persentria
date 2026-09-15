@@ -25,12 +25,13 @@ CAR_CONFIDENCE = 0.5
 CAR_CLASS_IDS = [2, 3, 5, 7]
 
 # ── Vehicle Recognition (OpenRouter Multimodal Vision) ────────
+# Active vision models verified on OpenRouter
 VEHICLE_AI_MODELS = [
-    "google/gemma-2-9b-it:free",
-    "meta-llama/llama-3.2-11b-vision-instruct:free",
-    "openai/gpt-4o-mini",
+    "inclusionai/ling-3.0-flash-vl:free",
+    "dots-studio/dots-3-note-preview:free",
+    "openrouter/free",
 ]
-VEHICLE_AI_TIMEOUT = 15
+VEHICLE_AI_TIMEOUT = 12
 
 # ── Gallery / Directory Batch Scanning ────────────────────────
 BATCH_IMAGE_LIMIT = 40

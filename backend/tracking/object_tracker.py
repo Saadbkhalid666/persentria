@@ -29,14 +29,18 @@ def track_cars(model, frame, confidence=None, persist=True):
     cars = []
     result = results[0]
 
-    if result.boxes is None or result.boxes.id is None:
+    if result.boxes is None or len(result.boxes) == 0:
         return cars
 
     boxes = result.boxes
+    track_ids = boxes.id
 
-    for box, track_id in zip(boxes.xyxy, boxes.id):
+    for idx, box in enumerate(boxes.xyxy):
         x1, y1, x2, y2 = map(int, box)
-        car_id = int(track_id)
+        if track_ids is not None and idx < len(track_ids):
+            car_id = int(track_ids[idx])
+        else:
+            car_id = idx + 1
 
         center_x = (x1 + x2) // 2
         center_y = (y1 + y2) // 2
@@ -72,7 +76,7 @@ def detect_cars_image(model, frame, confidence=None):
     cars = []
     result = results[0]
 
-    if result.boxes is None:
+    if result.boxes is None or len(result.boxes) == 0:
         return cars
 
     for idx, box in enumerate(result.boxes.xyxy, start=1):

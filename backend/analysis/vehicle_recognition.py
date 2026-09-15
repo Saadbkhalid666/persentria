@@ -13,12 +13,13 @@ if env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
-# Vision-capable models on OpenRouter (ordered by fallback preference)
-VEHICLE_AI_MODELS = [
-    "google/gemma-2-9b-it:free",
-    "meta-llama/llama-3.2-11b-vision-instruct:free",
-    "openai/gpt-4o-mini",
+# Vision-capable models on OpenRouter (ordered by speed and accuracy)
+DEFAULT_VEHICLE_AI_MODELS = [
+    "inclusionai/ling-3.0-flash-vl:free",
+    "dots-studio/dots-3-note-preview:free",
+    "openrouter/free",
 ]
+
 
 def get_openai_client():
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -27,24 +28,38 @@ def get_openai_client():
         api_key=api_key
     )
 
-def recognize_vehicle(image_base64):
+
+def recognize_vehicle(image_base64: str) -> str:
+    """
+    Call vision LLM to identify make, model, type, and confidence of a vehicle crop.
+    """
+    if not image_base64:
+        return "Brand: Unknown\nModel: Unknown\nType: Car\nConfidence: Low"
+
     client = get_openai_client()
 
     prompt_text = (
         "Identify the vehicle in this image.\n"
-        "Return only in this format:\n"
-        "Brand: <Manufacturer/Company name, e.g. Toyota, Honda, Tesla, BMW, Ford>\n"
-        "Model: <Model name, e.g. Civic, Model 3, Camry, Mustang>\n"
-        "Type: <e.g. Sedan, SUV, Truck, Hatchback, Motorcycle>\n"
-        "Confidence: <High, Medium, or Low>\n\n"
-        "If you cannot determine the exact brand or model, write Unknown."
+        "Return strictly in this exact format:\n"
+        "Brand: <Manufacturer name, e.g. Honda, Toyota, Tesla, BMW, Ford, Mercedes>\n"
+        "Model: <Model name, e.g. Civic, Model 3, Camry, Mustang, C-Class>\n"
+        "Type: <Body style, e.g. Sedan, SUV, Truck, Hatchback, Motorcycle, Coupe>\n"
+        "Confidence: <e.g. High, Medium, or Low>\n\n"
+        "If brand or model cannot be identified with certainty, write Unknown for that field."
     )
 
-    models_to_try = getattr(config, "VEHICLE_AI_MODELS", VEHICLE_AI_MODELS)
+    # Format data URL properly
+    if image_base64.startswith("data:image"):
+        data_url = image_base64
+    else:
+        data_url = f"data:image/jpeg;base64,{image_base64}"
+
+    models_to_try = getattr(config, "VEHICLE_AI_MODELS", DEFAULT_VEHICLE_AI_MODELS)
     last_error = None
 
     for model_name in models_to_try:
         try:
+            print(f"[vehicle_recognition] Querying model {model_name}...")
             response = client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -55,19 +70,26 @@ def recognize_vehicle(image_base64):
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                    "url": data_url
                                 },
                             },
                         ],
                     }
                 ],
-                timeout=getattr(config, "VEHICLE_AI_TIMEOUT", 15),
+                timeout=getattr(config, "VEHICLE_AI_TIMEOUT", 12),
             )
             content = response.choices[0].message.content
             if content:
-                return content
+                lower = content.lower()
+                # Ensure the model actually returned brand/model info rather than a refusal or safety tag
+                if "brand:" in lower or "model:" in lower or "make:" in lower:
+                    print(f"[vehicle_recognition] Success with {model_name}:\n{content.strip()}")
+                    return content
+                else:
+                    print(f"[vehicle_recognition] Model {model_name} returned non-standard format: {content.strip()[:60]}")
         except Exception as e:
             last_error = e
+            print(f"[vehicle_recognition] Model {model_name} failed: {e}")
             continue
 
     print(f"[vehicle_recognition] Notice: all models failed, last error: {last_error}")

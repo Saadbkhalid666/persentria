@@ -160,7 +160,8 @@ export default function CameraFeed({ data, isBackendOnline, onTelemetryUpdate })
       ctx.beginPath(); ctx.moveTo(x + w - cl, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cl); ctx.stroke();
 
       // Top label badge
-      const label = `Vehicle #${v.id}`;
+      const hasBrand = v.brand && v.brand !== 'Unknown' && v.brand !== 'Vehicle' && v.brand !== 'Recognizing...';
+      const label = hasBrand ? `${v.brand} ${v.model || ''}`.trim() : `Vehicle #${v.id}`;
       ctx.font = 'bold 11px monospace';
       const tw = ctx.measureText(label).width;
       ctx.fillStyle = 'rgba(7, 9, 19, 0.85)';
