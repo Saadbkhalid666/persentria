@@ -7,6 +7,9 @@ def load_car_model():
     return YOLO(config.YOLO_MODEL_PATH)
 
 
+load_model = load_car_model
+
+
 def detect_cars(model, frame, confidence=None):
     if confidence is None:
         confidence = config.CAR_CONFIDENCE

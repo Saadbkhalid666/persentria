@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://127.0.0.1:5000/api';
 
 export const checkBackendHealth = async () => {
   try {
@@ -13,25 +13,14 @@ export const checkBackendHealth = async () => {
   }
 };
 
-export const processPersonFrame = async (imageBase64) => {
-  const res = await fetch(`${API_BASE}/person/process_frame`, {
+export const processVehicleFrame = async (imageBase64) => {
+  const res = await fetch(`${API_BASE}/vehicle/process_frame`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: imageBase64, timestamp_ms: Date.now() }),
   });
   if (!res.ok) throw new Error(`Server error ${res.status}`);
   return res.json();
-};
-
-export const scanPersonDirectory = async (directoryPath) => {
-  const res = await fetch(`${API_BASE}/person/directory`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ directory_path: directoryPath }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-  return data;
 };
 
 export const scanVehicleDirectory = async (directoryPath, aiRecognition = true) => {
@@ -42,20 +31,6 @@ export const scanVehicleDirectory = async (directoryPath, aiRecognition = true) 
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-  return data;
-};
-
-export const uploadPersonFiles = async (files) => {
-  const fd = new FormData();
-  for (let i = 0; i < files.length; i++) {
-    fd.append('files', files[i]);
-  }
-  const res = await fetch(`${API_BASE}/person/batch_upload`, {
-    method: 'POST',
-    body: fd,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Upload failed');
   return data;
 };
 
