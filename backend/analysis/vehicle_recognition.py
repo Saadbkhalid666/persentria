@@ -14,10 +14,11 @@ if env_file.exists():
                 os.environ.setdefault(k.strip(), v.strip())
 
 DEFAULT_VEHICLE_AI_MODELS = [
-    "inclusionai/ling-3.0-flash-vl:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "qwen/qwen3-vl-8b-a3b-instruct:free",
     "dots-studio/dots-3-note-preview:free",
     "openrouter/free",
-]
+] 
 
 
 def get_openai_client():
