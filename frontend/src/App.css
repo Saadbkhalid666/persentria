@@ -1,4 +1,4 @@
-/* Custom animations and glow utility classes */
+ 
 @keyframes pulseGlow {
   0%, 100% {
     opacity: 0.8;

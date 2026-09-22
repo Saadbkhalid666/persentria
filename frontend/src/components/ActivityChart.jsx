@@ -4,7 +4,6 @@ import { BarChart2, Info, Car } from 'lucide-react';
 export default function ActivityChart({ data }) {
   const vehicles = data?.vehicles || [];
 
-  // Group vehicles by body style / type
   const typeCounts = {};
   vehicles.forEach((v) => {
     const t = v.type || 'Car';

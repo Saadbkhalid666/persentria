@@ -16,8 +16,7 @@ export default function App() {
   const [telemetry, setTelemetry] = useState(null);
   const [events, setEvents] = useState([]);
   const [isScanning, setIsScanning] = useState(false);
-
-  // Health ping
+ 
   const pingBackend = useCallback(async () => {
     const health = await checkBackendHealth();
     setIsBackendOnline(health.online);
@@ -30,7 +29,7 @@ export default function App() {
     return () => clearInterval(id);
   }, [pingBackend]);
 
-  // Live webcam vehicle telemetry from CameraFeed
+ 
   const handleLiveTelemetry = (t) => {
     setTelemetry(t);
     if (t.events?.length) {
@@ -38,7 +37,7 @@ export default function App() {
     }
   };
 
-  // Directory / Batch scan results
+ 
   const handleScanResults = (scanData) => {
     setTelemetry({
       vehicles_count: scanData.total_vehicles_detected || 0,
@@ -115,9 +114,9 @@ export default function App() {
         {/* Stats Bar */}
         <Statistics data={telemetry} />
 
-        {/* Main 3-column layout */}
+        
         <div className="flex flex-1 gap-4 min-h-0">
-          {/* Left / Center — Camera or Directory Scanner */}
+       
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             <div className="flex-1 min-h-0">
                
@@ -129,14 +128,14 @@ export default function App() {
 
             </div>
 
-            {/* Bottom row: event log + chart */}
+         
             <div className="grid grid-cols-2 gap-4" style={{ height: 240 }}>
               <EventLog events={events} />
               <ActivityChart data={telemetry} />
             </div>
           </div>
 
-          {/* Right sidebar — tracked vehicles */}
+     
           <div className="w-72 shrink-0 min-h-0">
             <Sidebar data={telemetry} />
           </div>
