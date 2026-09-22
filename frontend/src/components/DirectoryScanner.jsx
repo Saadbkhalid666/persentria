@@ -16,7 +16,7 @@ import {
 import { scanVehicleDirectory, uploadVehicleFiles } from '../lib/api';
 
 export default function DirectoryScanner({ onScanResults, isScanning, setIsScanning }) {
-  const [sourceType, setSourceType] = useState('gallery'); // 'gallery' | 'path'
+  const [sourceType, setSourceType] = useState('gallery'); 
   const [dirPath, setDirPath] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [useAI, setUseAI] = useState(true);

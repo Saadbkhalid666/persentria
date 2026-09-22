@@ -8,11 +8,9 @@ export default function ThreeBackground() {
     const container = mountRef.current;
     if (!container) return;
 
-    // Scene setup
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x070913, 0.02);
 
-    // Camera setup
     const camera = new THREE.PerspectiveCamera(
       60,
       container.clientWidth / container.clientHeight,
@@ -22,20 +20,17 @@ export default function ThreeBackground() {
     camera.position.set(0, 15, 35);
     camera.lookAt(0, 0, 0);
 
-    // Renderer setup
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Dark Theme Grid Plane
     const gridHelper = new THREE.GridHelper(120, 40, 0x06b6d4, 0x1e293b);
     gridHelper.position.y = -5;
     gridHelper.material.opacity = 0.2;
     gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
-    // Cyan/Violet Particles
     const particlesCount = 350;
     const posArray = new Float32Array(particlesCount * 3);
     const scaleArray = new Float32Array(particlesCount);
@@ -60,7 +55,6 @@ export default function ThreeBackground() {
     const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
     scene.add(particleMesh);
 
-    // 3D Floating Nodes
     const nodeGeometry = new THREE.IcosahedronGeometry(3, 1);
     const nodeMaterial = new THREE.MeshBasicMaterial({
       color: 0x8b5cf6,
@@ -77,7 +71,6 @@ export default function ThreeBackground() {
     node2.position.set(22, 12, -15);
     scene.add(node2);
 
-    // Mouse Interaction
     let mouseX = 0;
     let mouseY = 0;
 
@@ -88,7 +81,6 @@ export default function ThreeBackground() {
 
     window.addEventListener('mousemove', handleMouseMove);
 
-    // Resize Handler
     const handleResize = () => {
       if (!container) return;
       camera.aspect = container.clientWidth / container.clientHeight;
@@ -98,19 +90,16 @@ export default function ThreeBackground() {
 
     window.addEventListener('resize', handleResize);
 
-    // Animation Loop
     let animationFrameId;
     let clock = new THREE.Clock();
 
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth camera sway based on mouse
       camera.position.x += (mouseX * 4 - camera.position.x) * 0.03;
       camera.position.y += (-mouseY * 2 + 15 - camera.position.y) * 0.03;
       camera.lookAt(0, 0, 0);
 
-      // Rotate nodes & grid
       node1.rotation.x = elapsedTime * 0.2;
       node1.rotation.y = elapsedTime * 0.3;
 

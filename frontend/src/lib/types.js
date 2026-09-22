@@ -1,6 +1,4 @@
-/**
- * Persentria Real-Time AI Vehicle Recognition & Intelligence Models & Constants
- */
+ 
 
 export const VIEW_TABS = {
   WEBCAM: 'webcam',
